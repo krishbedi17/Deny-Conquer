@@ -1,0 +1,547 @@
+===== src/network/MessageToSend.java =====
+package network;
+
+import java.awt.*;
+import java.io.Serializable;
+
+public class MessageToSend implements Serializable {
+    int row, col;
+    Point pixel;
+    Color playerColor;
+    String type;
+
+    public MessageToSend(int row, int col, Point pixel, Color playerColor, String type) {
+        this.row = row;
+        this.col = col;
+        this.pixel = pixel;
+        this.playerColor = playerColor;
+        this.type = type;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public int getRow() {
+        return row;
+    }
+
+    public void setRow(int row) {
+        this.row = row;
+    }
+
+    public int getCol() {
+        return col;
+    }
+
+    public void setCol(int col) {
+        this.col = col;
+    }
+
+    public Point getPixel() {
+        return pixel;
+    }
+
+    public void setPixel(Point pixel) {
+        this.pixel = pixel;
+    }
+
+    public Color getPlayerColor() {
+        return playerColor;
+    }
+
+    public void setPlayerColor(Color playerColor) {
+        this.playerColor = playerColor;
+    }
+}
+
+
+===== src/network/Client.java =====
+package network;
+import game.Cell;
+import game.GamePanel;
+
+import javax.swing.*;
+import java.io.*;
+import java.net.Socket;
+
+public class Client {
+    private Socket socket;
+    private ObjectOutputStream out;
+    private ObjectInputStream in;
+
+    GamePanel panel;
+
+    public Client(GamePanel panel) throws IOException {
+        this.panel = panel;
+        this.socket = new Socket("127.0.0.1", 53333);
+        this.out = new ObjectOutputStream(socket.getOutputStream());
+        this.in = new ObjectInputStream(socket.getInputStream());
+
+        // Optional: listen for server messages in another thread
+        new Thread(this::listenToServer).start();
+    }
+
+    public void sendMessage(MessageToSend msg) {
+        try {
+            out.writeObject(msg);
+            out.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void listenToServer() {
+        try {
+            while (true) {
+                Object response = in.readObject();
+                System.out.println("Server: " + response);
+
+                if (response instanceof MessageToSend msg) {
+                    System.out.println("Received: " + msg);
+
+//                    panel.drawPixel(panel.getCell(msg.col, msg.row), msg.pixel.x, msg.pixel.y ,msg.getPlayerColor());
+                    if (msg.getType().equals("Scribble")) {
+                        SwingUtilities.invokeLater(() -> {
+                            Cell cell = panel.getCell(msg.row, msg.col);
+                            if (cell != null) {
+                                System.out.println("Cell is not null");
+                                cell.setBeingClaimed(true);
+                                cell.addDrawnPixel(msg.pixel.x % 50, msg.pixel.y % 50, msg.getPlayerColor());
+                                panel.repaint();
+                            }
+                        });
+                    } else if (msg.getType().equals("Release")) {
+                        SwingUtilities.invokeLater(() -> {
+                            Cell cell = panel.getCell(msg.row, msg.col);
+                            if (cell != null) {
+                                cell.checkIfValidFill(msg.getPlayerColor());
+                                panel.repaint();
+                            }
+                        });
+                    }
+                }
+
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Server connection closed or error: " + e.getMessage());
+        }
+    }
+
+    public void close() {
+        try {
+            socket.close();
+        } catch (IOException e) {
+            // Ignore
+        }
+    }
+}
+
+
+===== src/network/ClientHandler.java =====
+package network;
+
+import java.io.*;
+import java.net.Socket;
+
+public class ClientHandler implements Runnable {
+    private final Socket socket;
+    ObjectInputStream in = null;
+    ObjectOutputStream out = null;
+    private final Server server;
+
+    public ClientHandler(Socket socket, Server server) {
+        this.socket = socket;
+        this.server = server;
+    }
+
+    public void send(Object obj) {
+        try {
+            if (out != null) {
+                out.writeObject(obj);
+                out.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run() {
+        try {
+            in = new ObjectInputStream(socket.getInputStream());
+            out = new ObjectOutputStream(socket.getOutputStream());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            Object obj;
+            while ((obj = in.readObject()) != null) {
+                if (obj instanceof MessageToSend message) {
+                    System.out.println("Received message: " + message);
+//                    System.out.println(message.pixel.x + message.pixel.y);
+                    out.writeObject("Received your message!");
+                    server.broadcast(message);
+                }
+            }
+        } catch (EOFException e) {
+            // Client closed connection
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+            server.remove(this);
+            System.out.println("Client disconnected: " + socket.getInetAddress());
+        }
+    }
+}
+
+
+===== src/network/Server.java =====
+package network;
+
+import game.*;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+public class Server {
+    private ServerSocket serverSocket;
+    private final ArrayList<ClientHandler> clients = new ArrayList<>(); // changed this form something might break
+    GameBoard board;
+
+    public Server() throws IOException {
+        serverSocket = new ServerSocket(53333);
+        board = new GameBoard();
+        System.out.println("Server started on port 53333");
+    }
+
+    public void start() throws IOException {
+        while (true) {
+            Socket socket = serverSocket.accept();
+            System.out.println("New client connected: " + socket.getInetAddress());
+
+            ClientHandler handler = new ClientHandler(socket, this);  // Pass server reference if needed
+            clients.add(handler);
+            new Thread(handler).start();
+        }
+    }
+
+    public void broadcast(MessageToSend message) {
+        for (ClientHandler client : clients) {
+            client.send(message);
+        }
+    }
+
+    public void remove(ClientHandler client) {
+        clients.remove(client);
+    }
+
+    public static void main(String[] args) {
+        try {
+            Server server = new Server();
+            server.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+===== src/game/GameFrame.java =====
+package game;
+
+import javax.swing.*;
+import java.io.IOException;
+
+public class GameFrame extends JFrame {
+    public GameFrame() throws IOException {
+        setTitle("Deny and Conquer");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(false);
+
+        GamePanel gamePanel = new GamePanel();
+        add(gamePanel);
+        pack();
+
+        setLocationRelativeTo(null); // Center window
+        setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                new GameFrame();
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(null, "Could not connect to server:\n" + e.getMessage(),
+                        "Connection Error", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
+        });
+
+    }
+}
+
+
+===== src/game/GameBoard.java =====
+package game;
+
+import java.awt.*;
+
+public class GameBoard {
+    private final int rows = 8;
+    private final int cols = 8;
+    private final Cell[][] gameBoard;
+    private final int cellSize = 50;
+
+    public GameBoard() {
+        gameBoard = new Cell[rows][cols];
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                gameBoard[row][col] = new Cell(col * 50, row * 50);
+            }
+        }
+    }
+
+    public void drawBoard(Graphics2D g) {
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                int x = col * cellSize;
+                int y = row * cellSize;
+                gameBoard[row][col].draw(g, x, y);
+
+            }
+        }
+    }
+
+    public Cell getCellAtPixel(int x, int y) {
+        int col = x / cellSize;
+        int row = y / cellSize;
+
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
+            return gameBoard[row][col];
+        }
+        return null;
+    }
+
+    public Cell getCellByRowAndCol(int row, int col) {
+        return gameBoard[row][col];
+    }
+
+//    public boolean allCellsClaimed() {
+//        for (Cell[] row : grid) {
+//            for (Cell cell : row) {
+//                if (!cell.isClaimed()) {
+//                    return false;
+//                }
+//            }
+//        }
+//        return true;
+//    }
+//
+//    public int countOwnedByColor(Color color) {
+//        int count = 0;
+//        for (Cell[] row : grid) {
+//            for (Cell cell : row) {
+//                if (cell.getOwnerColor().equals(color)) {
+//                    count++;
+//                }
+//            }
+//        }
+//        return count;
+//    }
+}
+
+
+===== src/game/GamePanel.java =====
+package game;
+
+import network.Client;
+import network.MessageToSend;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.IOException;
+
+public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
+    private final GameBoard board;
+    private Cell cellBeingDrawnOn = null;
+    private final Color playerColor = Color.BLUE; // Placeholder for player 1 color
+    MessageToSend lastMsg;
+
+    Client player;
+
+    public GamePanel() throws IOException {
+        this.board = new GameBoard();
+        player = new Client(this);
+
+        setPreferredSize(new Dimension(50 * 8, 50 * 8));
+        addMouseListener(this);
+        addMouseMotionListener(this);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        board.drawBoard((Graphics2D) g);
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        Cell cell = board.getCellAtPixel(e.getX(), e.getY());
+        if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
+            cell.setBeingClaimed(true); // probably some mutexing
+            cellBeingDrawnOn = cell;
+        }
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        drawPixel(cellBeingDrawnOn, e.getX(), e.getY(), playerColor);
+    }
+
+    public void drawPixel(Cell cell,  int pixelX, int pixelY, Color color) {
+        if (cell != null) {
+            if (checkIfStillInsideCell(cell, pixelX, pixelY)) {
+                int x = pixelX % 50;
+                int y = pixelY % 50;
+                cell.addDrawnPixel(x, y, color);
+                repaint();
+
+                lastMsg = new MessageToSend(pixelX/50, pixelY/50, new Point(x, y), color, "Scribble");
+                player.sendMessage(lastMsg);
+            }
+        } else {
+            // do nothing
+        }
+    }
+
+    private boolean checkIfStillInsideCell(Cell cell,  int x, int y) {
+        Point startPoint = cell.locOnCanvas;
+        boolean flagX = (startPoint.x <= x && startPoint.x + 50 > x);
+        boolean flagY = (startPoint.y <= y && startPoint.y + 50 > y);
+        return (flagX && flagY);
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        if (cellBeingDrawnOn != null) {
+            cellBeingDrawnOn.checkIfValidFill(playerColor);
+            cellBeingDrawnOn = null;
+            repaint();
+
+            MessageToSend mouseReleaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release");
+            player.sendMessage(mouseReleaseMsg);
+        }
+    }
+
+    // Unused events
+    public void mouseClicked(MouseEvent e) {}
+    public void mouseEntered(MouseEvent e) {}
+    public void mouseExited(MouseEvent e) {}
+    public void mouseMoved(MouseEvent e) {}
+
+    public Cell getCell(int col, int row) {
+        return board.getCellByRowAndCol(row, col);
+    }
+}
+
+
+===== src/game/Cell.java =====
+package game;
+
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.Set;
+
+public class Cell {
+    Color colorOfCell = Color.WHITE;
+    boolean isClaimed = false;
+    boolean isBeingClaimed = false;
+
+    Point locOnCanvas;
+    BufferedImage drawing = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+
+    private final Set<Point> pixelSet = new HashSet<>();
+
+
+    public Cell(int x, int y) {
+        locOnCanvas = new Point(x, y);
+    }
+
+    public void draw(Graphics g, int x, int y) {
+        if (isClaimed) {
+            g.setColor(colorOfCell);
+            g.fillRect(x, y, 50, 50);
+        } else {
+            g.setColor(Color.WHITE);
+            g.fillRect(x, y, 50, 50);
+            g.drawImage(drawing, x, y, null);
+        }
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y, 50, 50);
+    }
+
+
+    public boolean isClaimed() {
+        return isClaimed;
+    }
+
+    public boolean isBeingClaimed() {
+        return isBeingClaimed;
+    }
+
+    public void setBeingClaimed(boolean flag) {
+        isBeingClaimed = flag;
+    }
+
+    public void addDrawnPixel(int x, int y, Color playerColor) {
+        if (!isClaimed && !isBeingClaimed) return;
+
+        if (!pixelSet.contains(new Point(x, y))) {
+            pixelSet.add(new Point(x, y));
+            Graphics2D g2d = drawing.createGraphics();
+            g2d.setColor(playerColor); // semi-transparent red
+            g2d.fillRect(x, y, 2, 2);
+            g2d.dispose();
+        }
+        System.out.println("Pixel Added: (" + x + ", " + y + ")");
+    }
+
+    public boolean checkIfValidFill(Color playerColor) {
+        boolean flag = false;
+        System.out.println("Checking fill — pixelSet size: " + pixelSet.size());
+
+        if (pixelSet.size() >= 125) {
+            colorOfCell = playerColor;
+            isClaimed = true;
+            System.out.println("Cell Valid");
+            flag = true;
+        } else {
+            Graphics2D g2d = drawing.createGraphics();
+            g2d.setComposite(AlphaComposite.Clear);
+            g2d.fillRect(0, 0, drawing.getWidth(), drawing.getHeight());
+            g2d.dispose();
+        }
+
+        pixelSet.clear();
+        isBeingClaimed = false;
+        return flag;
+    }
+}
+
+

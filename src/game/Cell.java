@@ -15,7 +15,6 @@ public class Cell {
 
     private final Set<Point> pixelSet = new HashSet<>();
 
-
     public Cell(int x, int y) {
         locOnCanvas = new Point(x, y);
     }
@@ -29,13 +28,27 @@ public class Cell {
             g.fillRect(x, y, 50, 50);
             g.drawImage(drawing, x, y, null);
         }
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y, 50, 50);
-    }
 
+        // Draw a border with a different color if the cell is being claimed
+        if (isBeingClaimed) {
+            g.setColor(Color.RED);
+            g.drawRect(x, y, 50, 50);
+            g.drawRect(x+1, y+1, 48, 48);
+        } else {
+            g.setColor(Color.BLACK);
+            g.drawRect(x, y, 50, 50);
+        }
+    }
 
     public boolean isClaimed() {
         return isClaimed;
+    }
+
+    public void setClaimed(boolean claimed, Color claimColor) {
+        this.isClaimed = claimed;
+        if (claimed) {
+            this.colorOfCell = claimColor;
+        }
     }
 
     public boolean isBeingClaimed() {
@@ -47,36 +60,36 @@ public class Cell {
     }
 
     public void addDrawnPixel(int x, int y, Color playerColor) {
-        if (!isClaimed && !isBeingClaimed) return;
+        if (isClaimed) return;
 
-        if (!pixelSet.contains(new Point(x, y))) {
-            pixelSet.add(new Point(x, y));
-            Graphics2D g2d = drawing.createGraphics();
-            g2d.setColor(playerColor); // semi-transparent red
-            g2d.fillRect(x, y, 2, 2);
-            g2d.dispose();
-        }
-        System.out.println("Pixel Added: (" + x + ", " + y + ")");
+        pixelSet.add(new Point(x, y));
+        Graphics2D g2d = drawing.createGraphics();
+        g2d.setColor(playerColor);
+        g2d.fillRect(x, y, 2, 2);
+        g2d.dispose();
     }
 
     public boolean checkIfValidFill(Color playerColor) {
-        boolean flag = false;
         System.out.println("Checking fill — pixelSet size: " + pixelSet.size());
 
         if (pixelSet.size() >= 125) {
             colorOfCell = playerColor;
             isClaimed = true;
             System.out.println("Cell Valid");
-            flag = true;
+            return true;
         } else {
-            Graphics2D g2d = drawing.createGraphics();
-            g2d.setComposite(AlphaComposite.Clear);
-            g2d.fillRect(0, 0, drawing.getWidth(), drawing.getHeight());
-            g2d.dispose();
+            clearDrawing();
+            return false;
         }
+    }
+
+    public void clearDrawing() {
+        Graphics2D g2d = drawing.createGraphics();
+        g2d.setComposite(AlphaComposite.Clear);
+        g2d.fillRect(0, 0, drawing.getWidth(), drawing.getHeight());
+        g2d.dispose();
 
         pixelSet.clear();
         isBeingClaimed = false;
-        return flag;
     }
 }

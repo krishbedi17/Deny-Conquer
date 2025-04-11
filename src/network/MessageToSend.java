@@ -4,15 +4,17 @@ import java.awt.*;
 import java.io.Serializable;
 
 public class MessageToSend implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     int row, col;
-    Point pixel;
+    SerializablePoint pixel; // Changed from Point to SerializablePoint
     Color playerColor;
     String type;
 
     public MessageToSend(int row, int col, Point pixel, Color playerColor, String type) {
         this.row = row;
         this.col = col;
-        this.pixel = pixel;
+        this.pixel = new SerializablePoint(pixel.x, pixel.y); // Convert Point to SerializablePoint
         this.playerColor = playerColor;
         this.type = type;
     }
@@ -42,11 +44,11 @@ public class MessageToSend implements Serializable {
     }
 
     public Point getPixel() {
-        return pixel;
+        return new Point(pixel.x, pixel.y); // Convert SerializablePoint back to Point
     }
 
     public void setPixel(Point pixel) {
-        this.pixel = pixel;
+        this.pixel = new SerializablePoint(pixel.x, pixel.y);
     }
 
     public Color getPlayerColor() {
@@ -55,5 +57,17 @@ public class MessageToSend implements Serializable {
 
     public void setPlayerColor(Color playerColor) {
         this.playerColor = playerColor;
+    }
+
+    // Inner class to make Point serializable
+    public static class SerializablePoint implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        int x, y;
+
+        public SerializablePoint(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
     }
 }

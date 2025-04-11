@@ -13,6 +13,8 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     private Cell cellBeingDrawnOn = null;
     private final Color playerColor = Color.BLUE; // Placeholder for player 1 color
     MessageToSend lastMsg;
+    private int currentCellRow = -1;
+    private int currentCellCol = -1;
 
     Client player;
 
@@ -37,6 +39,16 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
         if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
             cell.setBeingClaimed(true); // probably some mutexing
             cellBeingDrawnOn = cell;
+
+            // Store the current cell row and column
+            currentCellRow = e.getY() / 50;
+            currentCellCol = e.getX() / 50;
+
+            // Send a message to lock this cell for this player
+            MessageToSend lockMsg = new MessageToSend(currentCellRow, currentCellCol,
+                    new Point(e.getX() % 50, e.getY() % 50),
+                    playerColor, "Lock");
+            player.sendMessage(lockMsg);
         }
     }
 
@@ -45,7 +57,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
         drawPixel(cellBeingDrawnOn, e.getX(), e.getY(), playerColor);
     }
 
-    public void drawPixel(Cell cell,  int pixelX, int pixelY, Color color) {
+    public void drawPixel(Cell cell, int pixelX, int pixelY, Color color) {
         if (cell != null) {
             if (checkIfStillInsideCell(cell, pixelX, pixelY)) {
                 int x = pixelX % 50;
@@ -53,15 +65,14 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                 cell.addDrawnPixel(x, y, color);
                 repaint();
 
-                lastMsg = new MessageToSend(pixelX/50, pixelY/50, new Point(x, y), color, "Scribble");
+                // Make sure to use the stored row and column
+                lastMsg = new MessageToSend(currentCellRow, currentCellCol, new Point(pixelX, pixelY), color, "Scribble");
                 player.sendMessage(lastMsg);
             }
-        } else {
-            // do nothing
         }
     }
 
-    private boolean checkIfStillInsideCell(Cell cell,  int x, int y) {
+    private boolean checkIfStillInsideCell(Cell cell, int x, int y) {
         Point startPoint = cell.locOnCanvas;
         boolean flagX = (startPoint.x <= x && startPoint.x + 50 > x);
         boolean flagY = (startPoint.y <= y && startPoint.y + 50 > y);
@@ -71,12 +82,18 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     @Override
     public void mouseReleased(MouseEvent e) {
         if (cellBeingDrawnOn != null) {
-            cellBeingDrawnOn.checkIfValidFill(playerColor);
-            cellBeingDrawnOn = null;
-            repaint();
+            boolean filled = cellBeingDrawnOn.checkIfValidFill(playerColor);
 
-            MessageToSend mouseReleaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release");
-            player.sendMessage(mouseReleaseMsg);
+            String messageType = filled ? "Filled" : "Unlock";
+            MessageToSend releaseMsg = new MessageToSend(currentCellRow, currentCellCol,
+                    new Point(e.getX() % 50, e.getY() % 50),
+                    playerColor, messageType);
+            player.sendMessage(releaseMsg);
+
+            cellBeingDrawnOn = null;
+            currentCellRow = -1;
+            currentCellCol = -1;
+            repaint();
         }
     }
 
@@ -86,7 +103,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     public void mouseExited(MouseEvent e) {}
     public void mouseMoved(MouseEvent e) {}
 
-    public Cell getCell(int col, int row) {
+    public Cell getCell(int row, int col) {
         return board.getCellByRowAndCol(row, col);
     }
 }

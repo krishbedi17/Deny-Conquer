@@ -28,6 +28,7 @@ public class Client {
             out.writeObject(msg);
             out.flush();
         } catch (IOException e) {
+            System.err.println("Error sending message: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -36,36 +37,42 @@ public class Client {
         try {
             while (true) {
                 Object response = in.readObject();
-                System.out.println("Server: " + response);
 
                 if (response instanceof MessageToSend msg) {
-                    System.out.println("Received: " + msg);
+                    System.out.println("Received message of type: " + msg.getType());
 
-//                    panel.drawPixel(panel.getCell(msg.col, msg.row), msg.pixel.x, msg.pixel.y ,msg.getPlayerColor());
-                    if (msg.getType().equals("Scribble")) {
-                        SwingUtilities.invokeLater(() -> {
-                            Cell cell = panel.getCell(msg.row, msg.col);
-                            if (cell != null) {
-                                System.out.println("Cell is not null");
-                                cell.setBeingClaimed(true);
-                                cell.addDrawnPixel(msg.pixel.x % 50, msg.pixel.y % 50, msg.getPlayerColor());
-                                panel.repaint();
+                    SwingUtilities.invokeLater(() -> {
+                        Cell cell = panel.getCell(msg.row, msg.col);
+                        if (cell != null) {
+                            switch (msg.getType()) {
+                                case "Lock":
+                                    cell.setBeingClaimed(true);
+                                    break;
+
+                                case "Scribble":
+                                    cell.addDrawnPixel(msg.getPixel().x % 50, msg.getPixel().y % 50, msg.getPlayerColor());
+                                    break;
+
+                                case "Filled":
+                                    cell.setBeingClaimed(false);
+                                    cell.setClaimed(true, msg.getPlayerColor());
+                                    break;
+
+                                case "Unlock":
+                                    cell.setBeingClaimed(false);
+                                    cell.clearDrawing();
+                                    break;
                             }
-                        });
-                    } else if (msg.getType().equals("Release")) {
-                        SwingUtilities.invokeLater(() -> {
-                            Cell cell = panel.getCell(msg.row, msg.col);
-                            if (cell != null) {
-                                cell.checkIfValidFill(msg.getPlayerColor());
-                                panel.repaint();
-                            }
-                        });
-                    }
+                            panel.repaint();
+                        }
+                    });
                 }
-
             }
+        } catch (EOFException e) {
+            System.err.println("Server closed the connection");
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Server connection closed or error: " + e.getMessage());
+            System.err.println("Error in server communication: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
