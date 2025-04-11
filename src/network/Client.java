@@ -1,5 +1,6 @@
 package network;
 import game.Cell;
+import game.ColorPickerDialog;
 import game.GamePanel;
 
 import javax.swing.*;
@@ -80,6 +81,8 @@ public class Client {
                         synchronized (lockWaiter) {
                             lockWaiter.notify();
                         }
+                    }else if(msg.getType().equals("GameOver")){
+                        JOptionPane.showMessageDialog(panel, ColorPickerDialog.getColorName(msg.getPlayerColor()) + " wins the game!");
                     }
                 }
 

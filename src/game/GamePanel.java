@@ -98,8 +98,9 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
             MessageToSend mouseReleaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release","-1");
             player.sendMessage(mouseReleaseMsg);
             String color = checkWinCondition();
+            System.out.println("Color in mouseReleased:"+color);
             if(color!=null){
-                Color winnerColor = getColorFromName(color);
+                Color winnerColor = ColorPickerDialog.getColorFromName(color);
                 MessageToSend winMsg = new MessageToSend(-1, -1, new Point(0, 0), winnerColor, "GameOver", "0");
                 player.sendMessage(winMsg);
                 gameOver = true;
@@ -119,17 +120,18 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     public String checkWinCondition(){
         HashMap<String, Integer> colorCounts = new HashMap<>();
-        for (int row = 0; row < 8; row++) {
-            for (int col = 0; col < 8; col++) {
+        for (int row = 0; row < board.getBoardSize(); row++) {
+            for (int col = 0; col < board.getBoardSize(); col++) {
                 Cell cell = board.getCellByRowAndCol(row, col);
                 Color color = cell.getColorOfCell();
-                String colorName = getColorName(color);
+                String colorName = ColorPickerDialog.getColorName(color);
                 if(colorName.equalsIgnoreCase("WHITE")){
                     return null;
                 }
                 colorCounts.put(colorName, colorCounts.getOrDefault(colorName, 0) + 1);
             }
         }
+        System.out.println("Hello");
         String winner = null;
         int maxCount = 0;
         for (Map.Entry<String, Integer> entry : colorCounts.entrySet()){
@@ -138,26 +140,8 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                 maxCount = entry.getValue();
             }
         }
+        System.out.println("Winner: "+winner+" maxcount: "+ maxCount);
         return winner;
 
-    }
-    private String getColorName(Color color) {
-        if (color.equals(Color.RED)) return "RED";
-        if (color.equals(Color.BLUE)) return "BLUE";
-        if (color.equals(Color.GREEN)) return "GREEN";
-        if (color.equals(Color.ORANGE)) return "ORANGE";
-        if (color.equals(Color.MAGENTA)) return "MAGENTA";
-        if (color.equals(Color.WHITE)) return "WHITE";
-        return "UNKNOWN";
-    }
-    private Color getColorFromName(String name) {
-        switch (name.toUpperCase()) {
-            case "RED": return Color.RED;
-            case "BLUE": return Color.BLUE;
-            case "GREEN": return Color.GREEN;
-            case "ORANGE": return Color.ORANGE;
-            case "MAGENTA": return Color.MAGENTA;
-            default: return Color.GRAY;
-        }
     }
 }
