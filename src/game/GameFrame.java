@@ -1,7 +1,9 @@
 package game;
 
 import javax.swing.*;
+import java.awt.*;
 import java.io.IOException;
+import com.formdev.flatlaf.FlatLightLaf;
 
 public class GameFrame extends JFrame {
     public GameFrame() throws IOException {
@@ -9,7 +11,18 @@ public class GameFrame extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
 
-        GamePanel gamePanel = new GamePanel();
+        FlatLightLaf.setup();
+
+        UIManager.put("Label.font", new Font("SansSerif", Font.PLAIN, 14));
+        UIManager.put("Button.font", new Font("SansSerif", Font.PLAIN, 14));
+
+        WelcomePanel.UserSelection userSelection = WelcomePanel.showDialog(this);
+        String username = userSelection.getUsername();
+        Color selectedColor = userSelection.getColor();
+
+
+
+        GamePanel gamePanel = new GamePanel(selectedColor);
         add(gamePanel);
         pack();
 

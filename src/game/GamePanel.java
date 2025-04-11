@@ -11,17 +11,17 @@ import java.io.IOException;
 public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
     private final GameBoard board;
     private Cell cellBeingDrawnOn = null;
-    private final Color playerColor = Color.BLUE; // Placeholder for player 1 color
+    private Color playerColor; // Placeholder for player 1 color
     MessageToSend lastMsg;
     private int currentCellRow = -1;
     private int currentCellCol = -1;
 
     Client player;
 
-    public GamePanel() throws IOException {
+    public GamePanel(Color selectedColor) throws IOException {
         this.board = new GameBoard();
         player = new Client(this);
-
+        playerColor = selectedColor;
         setPreferredSize(new Dimension(50 * 8, 50 * 8));
         addMouseListener(this);
         addMouseMotionListener(this);
