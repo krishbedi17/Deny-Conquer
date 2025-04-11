@@ -5,13 +5,47 @@ import java.awt.*;
 
 public class ColorPickerDialog {
 
-    public static Color showColorPicker(Component parent) {
+    /**
+     * Displays a series of dialogs to:
+     * 1. Ask for a username.
+     * 2. Show the game rules.
+     * 3. Allow the user to pick one of five predefined colors.
+     *
+     * @param parent the parent component for the dialogs.
+     * @return A UserSelection object containing the username and chosen color.
+     */
+    public static UserSelection showDialog(Component parent) {
+        // 1. Ask for username
+        String username = JOptionPane.showInputDialog(
+                parent,
+                "Enter your username:",
+                "Username",
+                JOptionPane.PLAIN_MESSAGE
+        );
+        if (username == null || username.trim().isEmpty()) {
+            username = "Guest";
+        }
+
+        // 2. Show the game rules
+        String rules = "Game Rules:\n" +
+                "1. Claim a cell by drawing within it.\n" +
+                "2. Only one cell can be claimed at a time.\n" +
+                "3. Use your selected color to mark your territory.\n" +
+                "4. The game ends when all cells are claimed.\n" +
+                "5. The player with the most claimed cells wins!";
+        JOptionPane.showMessageDialog(
+                parent,
+                rules,
+                "Game Rules",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+
+        // 3. Provide a list of 5 colors to choose from
         String[] colorNames = {"Green", "Red", "Blue", "Orange", "Magenta"};
         Color[] colors = {Color.GREEN, Color.RED, Color.BLUE, Color.ORANGE, Color.MAGENTA};
-
-        String selectedName = (String) JOptionPane.showInputDialog(
+        String chosenColorName = (String) JOptionPane.showInputDialog(
                 parent,
-                "Choose your player color:",
+                "Choose Your Player Color:",
                 "Color Selection",
                 JOptionPane.PLAIN_MESSAGE,
                 null,
@@ -19,17 +53,35 @@ public class ColorPickerDialog {
                 colorNames[0]
         );
 
-        if (selectedName == null) {
-            // Default color if user closes dialog
-            return Color.GRAY;
-        }
-
+        Color chosenColor = Color.GRAY; // default fallback
         for (int i = 0; i < colorNames.length; i++) {
-            if (colorNames[i].equals(selectedName)) {
-                return colors[i];
+            if (colorNames[i].equals(chosenColorName)) {
+                chosenColor = colors[i];
+                break;
             }
         }
 
-        return Color.GRAY;
+        return new UserSelection(username, chosenColor);
+    }
+
+    /**
+     * A simple class to hold the user's selection data.
+     */
+    public static class UserSelection {
+        private final String username;
+        private final Color color;
+
+        public UserSelection(String username, Color color) {
+            this.username = username;
+            this.color = color;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public Color getColor() {
+            return color;
+        }
     }
 }

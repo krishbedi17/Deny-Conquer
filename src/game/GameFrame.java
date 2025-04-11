@@ -1,24 +1,38 @@
 package game;
 
+import com.formdev.flatlaf.FlatLightLaf;
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 
 public class GameFrame extends JFrame {
+
     public GameFrame() throws IOException {
+        // Set up the window
         setTitle("Deny and Conquer");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(false);
+        setLayout(new BorderLayout());
 
-        // Show color picker BEFORE creating GamePanel
-        Color selectedColor = ColorPickerDialog.showColorPicker(this);
+        // Using FlatLaf for a modern look
+        FlatLightLaf.setup();
 
-        // Create game panel with selected color
-        GamePanel gamePanel = new GamePanel(selectedColor);
-        add(gamePanel);
+        // Set global fonts if desired (optional)
+        UIManager.put("Label.font", new Font("SansSerif", Font.PLAIN, 14));
+        UIManager.put("Button.font", new Font("SansSerif", Font.PLAIN, 14));
+
+        // Get user selection from the custom color/username dialog
+        ColorPickerDialog.UserSelection userSelection = ColorPickerDialog.showDialog(this);
+        String username = userSelection.getUsername();
+        Color selectedColor = userSelection.getColor();
+
+        // Create and add the main game panel, passing the chosen color and username
+        GamePanel gamePanel = new GamePanel(username, selectedColor);
+        add(gamePanel, BorderLayout.CENTER);
+
+        // No menu bar is added (restart menu removed)
+
         pack();
-
-        setLocationRelativeTo(null); // Center window
+        setLocationRelativeTo(null); // center on screen
         setVisible(true);
     }
 
@@ -27,11 +41,12 @@ public class GameFrame extends JFrame {
             try {
                 new GameFrame();
             } catch (IOException e) {
-                JOptionPane.showMessageDialog(null, "Could not connect to server:\n" + e.getMessage(),
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(null,
+                        "Could not connect to server:\n" + e.getMessage(),
                         "Connection Error", JOptionPane.ERROR_MESSAGE);
                 System.exit(1);
             }
         });
-
     }
 }
