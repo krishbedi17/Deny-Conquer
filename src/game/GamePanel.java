@@ -7,6 +7,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
     private final GameBoard board;
@@ -14,6 +16,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     private Color playerColor;
     MessageToSend lastMsg;
     MessageToSend requestMsg;
+    private boolean gameOver = false;
 
     Client player;
 
@@ -35,7 +38,9 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     @Override
     public void mousePressed(MouseEvent e) {
-
+        if(gameOver){
+            return;
+        }
         boolean gotLock = player.requestLockAndWait(e.getX()/50, e.getY()/50, new Point(e.getX(), e.getY()));
         if (!gotLock) {
             System.out.println("Cell lock denied — input blocked.");
@@ -49,10 +54,14 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
             cellBeingDrawnOn = cell;
             // add cell to server list
         }
+
     }
 
     @Override
     public void mouseDragged(MouseEvent e) {
+        if(gameOver){
+            return;
+        }
         drawPixel(cellBeingDrawnOn, e.getX(), e.getY(), playerColor);
     }
 
@@ -88,6 +97,13 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
             MessageToSend mouseReleaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release","-1");
             player.sendMessage(mouseReleaseMsg);
+            String color = checkWinCondition();
+            if(color!=null){
+                Color winnerColor = getColorFromName(color);
+                MessageToSend winMsg = new MessageToSend(-1, -1, new Point(0, 0), winnerColor, "GameOver", "0");
+                player.sendMessage(winMsg);
+                gameOver = true;
+            }
         }
     }
 
@@ -99,5 +115,49 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     public Cell getCell(int col, int row) {
         return board.getCellByRowAndCol(row, col);
+    }
+
+    public String checkWinCondition(){
+        HashMap<String, Integer> colorCounts = new HashMap<>();
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Cell cell = board.getCellByRowAndCol(row, col);
+                Color color = cell.getColorOfCell();
+                String colorName = getColorName(color);
+                if(colorName.equalsIgnoreCase("WHITE")){
+                    return null;
+                }
+                colorCounts.put(colorName, colorCounts.getOrDefault(colorName, 0) + 1);
+            }
+        }
+        String winner = null;
+        int maxCount = 0;
+        for (Map.Entry<String, Integer> entry : colorCounts.entrySet()){
+            if(entry.getValue()> maxCount){
+                winner = entry.getKey();
+                maxCount = entry.getValue();
+            }
+        }
+        return winner;
+
+    }
+    private String getColorName(Color color) {
+        if (color.equals(Color.RED)) return "RED";
+        if (color.equals(Color.BLUE)) return "BLUE";
+        if (color.equals(Color.GREEN)) return "GREEN";
+        if (color.equals(Color.ORANGE)) return "ORANGE";
+        if (color.equals(Color.MAGENTA)) return "MAGENTA";
+        if (color.equals(Color.WHITE)) return "WHITE";
+        return "UNKNOWN";
+    }
+    private Color getColorFromName(String name) {
+        switch (name.toUpperCase()) {
+            case "RED": return Color.RED;
+            case "BLUE": return Color.BLUE;
+            case "GREEN": return Color.GREEN;
+            case "ORANGE": return Color.ORANGE;
+            case "MAGENTA": return Color.MAGENTA;
+            default: return Color.GRAY;
+        }
     }
 }

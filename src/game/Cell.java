@@ -88,4 +88,8 @@ public class Cell {
         isBeingClaimed = false;
         return flag;
     }
+
+    public Color getColorOfCell(){
+        return this.colorOfCell;
+    }
 }
