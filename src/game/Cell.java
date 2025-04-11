@@ -92,4 +92,8 @@ public class Cell {
         pixelSet.clear();
         isBeingClaimed = false;
     }
+
+    public Color getColorOfCell(){
+        return this.colorOfCell;
+    }
 }

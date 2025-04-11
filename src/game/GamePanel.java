@@ -7,6 +7,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
     private final GameBoard board;
@@ -94,6 +96,13 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
             currentCellRow = -1;
             currentCellCol = -1;
             repaint();
+            String color = checkWinCondition();
+            System.out.println("Color in mouseReleased:"+color);
+            if(color!=null){
+                Color winnerColor = WelcomePanel.getColorFromName(color);
+                MessageToSend winMsg = new MessageToSend(0, 0, new Point(0, 0), winnerColor, "GameOver");
+                player.sendMessage(winMsg);
+            }
         }
     }
 
@@ -105,5 +114,32 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     public Cell getCell(int row, int col) {
         return board.getCellByRowAndCol(row, col);
+    }
+
+    public String checkWinCondition(){
+        HashMap<String, Integer> colorCounts = new HashMap<>();
+        for (int row = 0; row < board.getBoardSize(); row++) {
+            for (int col = 0; col < board.getBoardSize(); col++) {
+                Cell cell = board.getCellByRowAndCol(row, col);
+                Color color = cell.getColorOfCell();
+                String colorName = WelcomePanel.getColorName(color);
+                if(colorName.equalsIgnoreCase("WHITE")){
+                    return null;
+                }
+                colorCounts.put(colorName, colorCounts.getOrDefault(colorName, 0) + 1);
+            }
+        }
+        System.out.println("Hello");
+        String winner = null;
+        int maxCount = 0;
+        for (Map.Entry<String, Integer> entry : colorCounts.entrySet()){
+            if(entry.getValue()> maxCount){
+                winner = entry.getKey();
+                maxCount = entry.getValue();
+            }
+        }
+        System.out.println("Winner: "+winner+" maxcount: "+ maxCount);
+        return winner;
+
     }
 }

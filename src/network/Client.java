@@ -1,6 +1,7 @@
 package network;
 import game.Cell;
 import game.GamePanel;
+import game.WelcomePanel;
 
 import javax.swing.*;
 import java.io.*;
@@ -62,6 +63,8 @@ public class Client {
                                     cell.setBeingClaimed(false);
                                     cell.clearDrawing();
                                     break;
+                                case "GameOver":
+                                    JOptionPane.showMessageDialog(panel, WelcomePanel.getColorName(msg.getPlayerColor()) + " wins the game!");
                             }
                             panel.repaint();
                         }

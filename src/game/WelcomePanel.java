@@ -84,4 +84,25 @@ public class WelcomePanel {
             return color;
         }
     }
+
+    public static String getColorName(Color color) {
+        if (color.equals(Color.RED)) return "RED";
+        if (color.equals(Color.BLUE)) return "BLUE";
+        if (color.equals(Color.GREEN)) return "GREEN";
+        if (color.equals(Color.ORANGE)) return "ORANGE";
+        if (color.equals(Color.MAGENTA)) return "MAGENTA";
+        if (color.equals(Color.WHITE)) return "WHITE";
+        return "UNKNOWN";
+    }
+    public static Color getColorFromName(String name) {
+        switch (name.toUpperCase()) {
+            case "RED": return Color.RED;
+            case "BLUE": return Color.BLUE;
+            case "GREEN": return Color.GREEN;
+            case "ORANGE": return Color.ORANGE;
+            case "MAGENTA": return Color.MAGENTA;
+            case "WHITE": return Color.WHITE;
+            default: return Color.GRAY;
+        }
+    }
 }

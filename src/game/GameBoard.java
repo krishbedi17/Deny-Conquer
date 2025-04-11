@@ -3,8 +3,8 @@ package game;
 import java.awt.*;
 
 public class GameBoard {
-    private final int rows = 8;
-    private final int cols = 8;
+    private final int rows = 4;
+    private final int cols = 4;
     private final Cell[][] gameBoard;
     private final int cellSize = 50;
 
@@ -40,6 +40,10 @@ public class GameBoard {
 
     public Cell getCellByRowAndCol(int row, int col) {
         return gameBoard[row][col];
+    }
+
+    public int getBoardSize(){
+        return this.rows;
     }
 
 //    public boolean allCellsClaimed() {
