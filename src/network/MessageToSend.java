@@ -8,13 +8,15 @@ public class MessageToSend implements Serializable {
     Point pixel;
     Color playerColor;
     String type;
+    String senderID;
 
-    public MessageToSend(int row, int col, Point pixel, Color playerColor, String type) {
+    public MessageToSend(int row, int col, Point pixel, Color playerColor, String type, String senderID) {
         this.row = row;
         this.col = col;
         this.pixel = pixel;
         this.playerColor = playerColor;
         this.type = type;
+        this.senderID = senderID;
     }
 
     public String getType() {
@@ -55,5 +57,9 @@ public class MessageToSend implements Serializable {
 
     public void setPlayerColor(Color playerColor) {
         this.playerColor = playerColor;
+    }
+
+    public void setSenderID(String senderID) {
+        this.senderID = senderID;
     }
 }

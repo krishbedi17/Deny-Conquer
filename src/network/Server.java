@@ -13,6 +13,8 @@ public class Server {
     private final ArrayList<ClientHandler> clients = new ArrayList<>(); // changed this form something might break
     GameBoard board;
 
+    //cells being claimed list
+
     public Server() throws IOException {
         serverSocket = new ServerSocket(53333);
         board = new GameBoard();

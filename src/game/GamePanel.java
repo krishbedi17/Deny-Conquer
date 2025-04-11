@@ -11,8 +11,9 @@ import java.io.IOException;
 public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
     private final GameBoard board;
     private Cell cellBeingDrawnOn = null;
-    private final Color playerColor = Color.BLUE; // Placeholder for player 1 color
+    private final Color playerColor = Color.RED; // Placeholder for player 1 color
     MessageToSend lastMsg;
+    MessageToSend requestMsg;
 
     Client player;
 
@@ -34,9 +35,12 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     @Override
     public void mousePressed(MouseEvent e) {
         Cell cell = board.getCellAtPixel(e.getX(), e.getY());
+        requestMsg = new MessageToSend(e.getX()/50, e.getY()/50, new Point(e.getX(), e.getY()), Color.BLACK, "Request","-1");
+        player.sendMessage(requestMsg);
         if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
             cell.setBeingClaimed(true); // probably some mutexing
             cellBeingDrawnOn = cell;
+            // add cell to server list
         }
     }
 
@@ -53,7 +57,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                 cell.addDrawnPixel(x, y, color);
                 repaint();
 
-                lastMsg = new MessageToSend(pixelX/50, pixelY/50, new Point(x, y), color, "Scribble");
+                lastMsg = new MessageToSend(pixelX/50, pixelY/50, new Point(x, y), color, "Scribble","-1");
                 player.sendMessage(lastMsg);
             }
         } else {
@@ -75,7 +79,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
             cellBeingDrawnOn = null;
             repaint();
 
-            MessageToSend mouseReleaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release");
+            MessageToSend mouseReleaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release","-1");
             player.sendMessage(mouseReleaseMsg);
         }
     }

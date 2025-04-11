@@ -5,17 +5,19 @@ import game.GamePanel;
 import javax.swing.*;
 import java.io.*;
 import java.net.Socket;
+import java.util.UUID;
 
 public class Client {
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
-
+    private String clientID;
     GamePanel panel;
 
     public Client(GamePanel panel) throws IOException {
         this.panel = panel;
         this.socket = new Socket("127.0.0.1", 53333);
+        this.clientID = UUID.randomUUID().toString();
         this.out = new ObjectOutputStream(socket.getOutputStream());
         this.in = new ObjectInputStream(socket.getInputStream());
 
@@ -25,6 +27,7 @@ public class Client {
 
     public void sendMessage(MessageToSend msg) {
         try {
+            msg.setSenderID(clientID);
             out.writeObject(msg);
             out.flush();
         } catch (IOException e) {
@@ -60,6 +63,9 @@ public class Client {
                                 panel.repaint();
                             }
                         });
+                    }
+                    else if (msg.getType().equals("Request")) {
+                       System.out.println("Hello:"+msg);
                     }
                 }
 
