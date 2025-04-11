@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.concurrent.CopyOnWriteArrayList;
+// import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Server {
     private ServerSocket serverSocket;
@@ -41,6 +41,7 @@ public class Server {
                 sendToClient(message.getSenderID(), message);
             } else {
                 // Lock not acquired — deny request
+                System.out.println("DENIED: " + message.senderID);
                 message.setType("LockDenied");
                 sendToClient(message.getSenderID(), message);
             }

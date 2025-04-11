@@ -22,7 +22,7 @@ public class Client {
     private volatile boolean lockGranted = false;
     public Client(GamePanel panel) throws IOException {
         this.panel = panel;
-        this.socket = new Socket("192.168.1.246", 53333);
+        this.socket = new Socket("127.0.0.1", 53333);
         this.clientID = UUID.randomUUID().toString();
         this.out = new ObjectOutputStream(socket.getOutputStream());
         this.in = new ObjectInputStream(socket.getInputStream());

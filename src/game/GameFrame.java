@@ -1,6 +1,7 @@
 package game;
 
 import javax.swing.*;
+import java.awt.*;
 import java.io.IOException;
 
 public class GameFrame extends JFrame {
@@ -9,7 +10,11 @@ public class GameFrame extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
 
-        GamePanel gamePanel = new GamePanel();
+        // Show color picker BEFORE creating GamePanel
+        Color selectedColor = ColorPickerDialog.showColorPicker(this);
+
+        // Create game panel with selected color
+        GamePanel gamePanel = new GamePanel(selectedColor);
         add(gamePanel);
         pack();
 
