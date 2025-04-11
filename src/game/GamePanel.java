@@ -13,20 +13,27 @@ import java.util.Map;
 public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
     private final GameBoard board;
     private Cell cellBeingDrawnOn = null;
-    private Color playerColor; // Placeholder for player 1 color
+    private Color playerColor;
+    private final String username;
+    private JLabel statusLabel; // Reference to the status label
     MessageToSend lastMsg;
     private int currentCellRow = -1;
     private int currentCellCol = -1;
 
     Client player;
 
-    public GamePanel(Color selectedColor) throws IOException {
+    public GamePanel(Color selectedColor, String username) throws IOException {
         this.board = new GameBoard();
         player = new Client(this);
         playerColor = selectedColor;
+        this.username = username;
         setPreferredSize(new Dimension(50 * 8, 50 * 8));
         addMouseListener(this);
         addMouseMotionListener(this);
+    }
+
+    public void setStatusLabel(JLabel statusLabel) {
+        this.statusLabel = statusLabel;
     }
 
     @Override
@@ -39,7 +46,7 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     public void mousePressed(MouseEvent e) {
         Cell cell = board.getCellAtPixel(e.getX(), e.getY());
         if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
-            cell.setBeingClaimed(true); // probably some mutexing
+            cell.setBeingClaimed(true);
             cellBeingDrawnOn = cell;
 
             // Store the current cell row and column
@@ -51,6 +58,15 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                     new Point(e.getX() % 50, e.getY() % 50),
                     playerColor, "Lock");
             player.sendMessage(lockMsg);
+
+            // Update the status label
+            if (statusLabel != null) {
+                statusLabel.setText(username + " locked the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + "). Start drawing!");
+            }
+        } else if (cell != null) {
+            if (statusLabel != null) {
+                statusLabel.setText("Cell is already claimed or being drawn on!");
+            }
         }
     }
 
@@ -70,6 +86,11 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                 // Make sure to use the stored row and column
                 lastMsg = new MessageToSend(currentCellRow, currentCellCol, new Point(pixelX, pixelY), color, "Scribble");
                 player.sendMessage(lastMsg);
+
+                // Update the status label
+                if (statusLabel != null) {
+                    statusLabel.setText(username + " is drawing on the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + ").");
+                }
             }
         }
     }
@@ -92,18 +113,28 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
                     playerColor, messageType);
             player.sendMessage(releaseMsg);
 
+            // Update the status label
+            if (statusLabel != null) {
+                if (filled) {
+                    statusLabel.setText(username + " successfully claimed the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + ")!");
+                } else {
+                    statusLabel.setText(username + " released the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + ").");
+                }
+            }
+
             cellBeingDrawnOn = null;
             currentCellRow = -1;
             currentCellCol = -1;
             repaint();
+
             String color = checkWinCondition();
-            if(color!=null && color.equals("Draw")){
+            if (color != null && color.equals("Draw")) {
                 MessageToSend winMsg = new MessageToSend(0, 0, new Point(0, 0), Color.WHITE, "Draw");
                 player.sendMessage(winMsg);
                 return;
             }
-            System.out.println("Color in mouseReleased:"+color);
-            if(color!=null){
+
+            if (color != null) {
                 Color winnerColor = WelcomePanel.getColorFromName(color);
                 MessageToSend winMsg = new MessageToSend(0, 0, new Point(0, 0), winnerColor, "GameOver");
                 player.sendMessage(winMsg);
@@ -121,39 +152,37 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
         return board.getCellByRowAndCol(row, col);
     }
 
-    public String checkWinCondition(){
+    public String checkWinCondition() {
         HashMap<String, Integer> colorCounts = new HashMap<>();
         for (int row = 0; row < board.getBoardSize(); row++) {
             for (int col = 0; col < board.getBoardSize(); col++) {
                 Cell cell = board.getCellByRowAndCol(row, col);
                 Color color = cell.getColorOfCell();
                 String colorName = WelcomePanel.getColorName(color);
-                if(colorName.equalsIgnoreCase("WHITE")){
+                if (colorName.equalsIgnoreCase("WHITE")) {
                     return null;
                 }
                 colorCounts.put(colorName, colorCounts.getOrDefault(colorName, 0) + 1);
             }
         }
-        System.out.println("Hello");
+
         String winner = null;
         int maxCount = 0;
         boolean tie = false;
 
-        for (Map.Entry<String, Integer> entry : colorCounts.entrySet()){
-            if(entry.getValue()> maxCount){
+        for (Map.Entry<String, Integer> entry : colorCounts.entrySet()) {
+            if (entry.getValue() > maxCount) {
                 winner = entry.getKey();
                 maxCount = entry.getValue();
                 tie = false;
-            }
-            else if (entry.getValue() == maxCount) {
+            } else if (entry.getValue() == maxCount) {
                 tie = true; // Found a tie
             }
         }
+
         if (tie) {
             return "Draw";
         }
-        System.out.println("Winner: "+winner+" maxcount: "+ maxCount);
         return winner;
-
     }
 }

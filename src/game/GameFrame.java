@@ -6,6 +6,8 @@ import java.io.IOException;
 import com.formdev.flatlaf.FlatLightLaf;
 
 public class GameFrame extends JFrame {
+    private JLabel statusLabel;
+
     public GameFrame() throws IOException {
         setTitle("Deny and Conquer");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -16,16 +18,28 @@ public class GameFrame extends JFrame {
         UIManager.put("Label.font", new Font("SansSerif", Font.PLAIN, 14));
         UIManager.put("Button.font", new Font("SansSerif", Font.PLAIN, 14));
 
+        // Show the dialog for username and color selection
         WelcomePanel.UserSelection userSelection = WelcomePanel.showDialog(this);
         String username = userSelection.getUsername();
         Color selectedColor = userSelection.getColor();
 
+        // Create the game panel
+        GamePanel gamePanel = new GamePanel(selectedColor, username);
 
+        // Create the status panel
+        statusLabel = new JLabel("Welcome, " + username + "! Choose a cell to begin.");
+        JPanel statusPanel = new JPanel(new BorderLayout());
+        statusPanel.add(statusLabel, BorderLayout.CENTER);
+        statusPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
 
-        GamePanel gamePanel = new GamePanel(selectedColor);
-        add(gamePanel);
+        // Add game panel and status panel to the frame
+        add(gamePanel, BorderLayout.CENTER);
+        add(statusPanel, BorderLayout.SOUTH);
+
+        // Set the status label in the game panel for interaction
+        gamePanel.setStatusLabel(statusLabel);
+
         pack();
-
         setLocationRelativeTo(null); // Center window
         setVisible(true);
     }
@@ -40,6 +54,5 @@ public class GameFrame extends JFrame {
                 System.exit(1);
             }
         });
-
     }
 }

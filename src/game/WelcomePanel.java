@@ -4,16 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 
 public class WelcomePanel {
-
-    /**
-     * Displays a series of dialogs to:
-     * 1. Ask for a username.
-     * 2. Show the game rules.
-     * 3. Allow the user to pick one of five predefined colors.
-     *
-     * @param parent the parent component for the dialogs.
-     * @return A UserSelection object containing the username and chosen color.
-     */
     public static UserSelection showDialog(Component parent) {
         // 1. Ask for username
         String username = JOptionPane.showInputDialog(
@@ -53,7 +43,7 @@ public class WelcomePanel {
                 colorNames[0]
         );
 
-        Color chosenColor = Color.GRAY; // default fallback
+        Color chosenColor = Color.GRAY;
         for (int i = 0; i < colorNames.length; i++) {
             if (colorNames[i].equals(chosenColorName)) {
                 chosenColor = colors[i];
@@ -63,11 +53,7 @@ public class WelcomePanel {
 
         return new UserSelection(username, chosenColor);
     }
-
-    /**
-     * A simple class to hold the user's selection data.
-     */
-    public static class UserSelection {
+     public static class UserSelection {
         private final String username;
         private final Color color;
 
