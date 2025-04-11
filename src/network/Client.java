@@ -45,23 +45,23 @@ public class Client {
         try {
             while (true) {
                 Object response = in.readObject();
-                System.out.println("Server: " + response);
+//                System.out.println("Server: " + response);
 
                 if (response instanceof MessageToSend msg) {
-                    System.out.println("Received: " + msg);
+                    System.out.println("Received: " + msg.getType());
 
 //                    panel.drawPixel(panel.getCell(msg.col, msg.row), msg.pixel.x, msg.pixel.y ,msg.getPlayerColor());
                     if (msg.getType().equals("Scribble")) {
                         SwingUtilities.invokeLater(() -> {
                             Cell cell = panel.getCell(msg.row, msg.col);
                             if (cell != null) {
-                                System.out.println("Cell is not null");
+//                                System.out.println("Cell is not null");
                                 cell.setBeingClaimed(true);
                                 cell.addDrawnPixel(msg.pixel.x % 50, msg.pixel.y % 50, msg.getPlayerColor());
                                 panel.repaint();
                             }
                         });
-                    } else if (msg.getType().equals("Release")) {
+                    } else if (msg.getType().equals("ReleaseFilled") || msg.getType().equals("ReleaseNotFilled") ) {
                         SwingUtilities.invokeLater(() -> {
                             Cell cell = panel.getCell(msg.row, msg.col);
                             if (cell != null) {
@@ -71,13 +71,13 @@ public class Client {
                         });
                     }
                     else if (msg.getType().equals("LockGranted")) {
-                        lockGranted = true;
                         synchronized (lockWaiter) {
+                            lockGranted = true;
                             lockWaiter.notify();
                         }
                     } else if (msg.getType().equals("LockDenied")) {
-                        lockGranted = false;
                         synchronized (lockWaiter) {
+                            lockGranted = false;
                             lockWaiter.notify();
                         }
                     }
@@ -90,19 +90,25 @@ public class Client {
     }
 
     public boolean requestLockAndWait(int row, int col, Point pixel) {
-        lockGranted = false;
-        MessageToSend requestMsg = new MessageToSend(row, col, pixel, Color.BLACK, "Request", this.clientID);
-        sendMessage(requestMsg);
-
         synchronized (lockWaiter) {
+            lockGranted = false;
+            MessageToSend requestMsg = new MessageToSend(row, col, pixel, Color.BLACK, "RequestLock", this.clientID);
+            sendMessage(requestMsg);
+
+            long start = System.currentTimeMillis();
             try {
                 lockWaiter.wait(1000); // wait up to 1 second
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                System.err.println("Lock wait interrupted: " + e.getMessage());
             }
-        }
 
-        return lockGranted;
+            long elapsed = System.currentTimeMillis() - start;
+            if (elapsed >= 1000) {
+                System.out.println("⚠️ Timeout waiting for lock on cell (" + row + ", " + col + ")");
+            }
+
+            return lockGranted;
+        }
     }
 
 
@@ -119,4 +125,11 @@ public class Client {
     }
 
 
+    public void setLockGranted(boolean b) {
+        lockGranted = b;
+    }
+
+    public String getClientID() {
+        return clientID;
+    }
 }

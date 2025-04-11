@@ -44,7 +44,8 @@ public class ClientHandler implements Runnable {
                     this.clientId = message.getSenderID();
 //                    System.out.println(message.pixel.x + message.pixel.y);
                     out.writeObject("Received your message!");
-                    server.broadcast(message);
+//                    server.broadcast(message);
+                    server.serverAction(message);
                 }
             }
         } catch (EOFException e) {

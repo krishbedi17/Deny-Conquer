@@ -33,29 +33,6 @@ public class Server {
     }
 
     public void broadcast(MessageToSend message) {
-        if (message.getType().equals("Request")) {
-            Cell requestedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
-            if (requestedCell != null && requestedCell.tryLock()) {
-                // Lock acquired — send confirmation only to sender
-                message.setType("LockGranted");
-                sendToClient(message.getSenderID(), message);
-            } else {
-                // Lock not acquired — deny request
-                System.out.println("DENIED: " + message.senderID);
-                message.setType("LockDenied");
-                sendToClient(message.getSenderID(), message);
-            }
-            return;
-        }
-
-        else if (message.getType().equals("Release")) {
-            // chcek that release is only possible when ;ock is granted
-            Cell releasedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
-            if (releasedCell != null) {
-                releasedCell.unlock();
-            }
-        }
-
         for (ClientHandler client : clients) {
             client.send(message);
         }
@@ -80,6 +57,41 @@ public class Server {
             server.start();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void serverAction(MessageToSend message) {
+        String messageType = message.getType();
+        System.out.println("Message Type: " + messageType);
+        if (messageType.equals("RequestLock")) {
+            grantLock(message);
+        } else if (messageType.equals("ReleaseFilled")) {
+            // stays locked
+            broadcast(message);
+        }  else if (messageType.equals("ReleaseNotFilled")) {
+            Cell releasedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
+            if (releasedCell != null) {
+                releasedCell.unlock();
+            }
+            broadcast(message);
+        } else if (messageType.equals("Scribble")) {
+            broadcast(message);
+        }
+    }
+
+    public void grantLock(MessageToSend message) {
+        Cell requestedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
+        if (requestedCell != null && requestedCell.tryLock()) {
+            // Lock acquired — send confirmation only to sender
+            message.setType("LockGranted");
+            sendToClient(message.getSenderID(), message);
+            System.out.println("Lock was granted to: " + message.getSenderID());
+        } else {
+            // Lock not acquired — deny request
+            System.out.println("DENIED: " + message.senderID);
+            message.setType("LockDenied");
+            sendToClient(message.getSenderID(), message);
+            System.out.println("Lock not able granted to: " + message.getSenderID());
         }
     }
 }

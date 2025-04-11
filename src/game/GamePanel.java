@@ -98,9 +98,6 @@ public class GamePanel extends JPanel {
             } else {
                 statusLabel.setText("Cell lock granted. Start filling...");
             }
-            // Send a lock request message.
-//            MessageToSend requestMsg = new MessageToSend(row, col, new Point(e.getX(), e.getY()), Color.BLACK, "Request", "-1");
-//            player.sendMessage(requestMsg);
 
             Cell cell = board.getCellAtPixel(e.getX(), e.getY());
             if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
@@ -111,6 +108,9 @@ public class GamePanel extends JPanel {
 
         @Override
         public void mouseDragged(MouseEvent e) {
+            if (!player.getLockGranted()) {
+                return;
+            }
             if (gameOver) return;
             // Update status while drawing.
             statusLabel.setText("Filling cell...");
@@ -127,9 +127,17 @@ public class GamePanel extends JPanel {
                 boolean filled = cellBeingDrawnOn.checkIfValidFill(playerColor);
                 cellBeingDrawnOn = null;
                 repaint();
-
-                MessageToSend releaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), "Release", "-1");
-                player.sendMessage(releaseMsg);
+                String messageType = "Release";
+                if (filled) {
+                    messageType += "Filled";
+                } else {
+                    messageType += "NotFilled";
+                }
+                if (lastMsg != null) {
+                    MessageToSend releaseMsg = new MessageToSend(lastMsg.getRow(), lastMsg.getCol(), lastMsg.getPixel(), lastMsg.getPlayerColor(), messageType, player.getClientID());
+                    player.sendMessage(releaseMsg);
+                    player.setLockGranted(false); // maybe should do this after
+                }
 
                 if (filled) {
                     statusLabel.setText("Cell filled successfully!");
@@ -140,7 +148,7 @@ public class GamePanel extends JPanel {
                 String winColor = checkWinCondition();
                 if (winColor != null) {
                     Color winnerColor = getColorFromName(winColor);
-                    MessageToSend winMsg = new MessageToSend(-1, -1, new Point(0, 0), winnerColor, "GameOver", "0");
+                    MessageToSend winMsg = new MessageToSend(-1, -1, new Point(0, 0), winnerColor, "GameOver", player.getClientID());
                     player.sendMessage(winMsg);
                     gameOver = true;
                     statusLabel.setText("Game Over! Winner: " + winColor);
@@ -174,7 +182,7 @@ public class GamePanel extends JPanel {
             int y = pixelY % 50;
             cell.addDrawnPixel(x, y, color);
             boardPanel.repaint();
-            lastMsg = new MessageToSend(pixelX / 50, pixelY / 50, new Point(x, y), color, "Scribble", "-1");
+            lastMsg = new MessageToSend(pixelX / 50, pixelY / 50, new Point(x, y), color, "Scribble", player.getClientID());
             player.sendMessage(lastMsg);
         }
     }
