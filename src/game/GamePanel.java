@@ -97,6 +97,11 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
             currentCellCol = -1;
             repaint();
             String color = checkWinCondition();
+            if(color!=null && color.equals("Draw")){
+                MessageToSend winMsg = new MessageToSend(0, 0, new Point(0, 0), Color.WHITE, "Draw");
+                player.sendMessage(winMsg);
+                return;
+            }
             System.out.println("Color in mouseReleased:"+color);
             if(color!=null){
                 Color winnerColor = WelcomePanel.getColorFromName(color);
@@ -132,11 +137,20 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
         System.out.println("Hello");
         String winner = null;
         int maxCount = 0;
+        boolean tie = false;
+
         for (Map.Entry<String, Integer> entry : colorCounts.entrySet()){
             if(entry.getValue()> maxCount){
                 winner = entry.getKey();
                 maxCount = entry.getValue();
+                tie = false;
             }
+            else if (entry.getValue() == maxCount) {
+                tie = true; // Found a tie
+            }
+        }
+        if (tie) {
+            return "Draw";
         }
         System.out.println("Winner: "+winner+" maxcount: "+ maxCount);
         return winner;

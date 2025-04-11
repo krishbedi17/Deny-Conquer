@@ -65,6 +65,8 @@ public class Client {
                                     break;
                                 case "GameOver":
                                     JOptionPane.showMessageDialog(panel, WelcomePanel.getColorName(msg.getPlayerColor()) + " wins the game!");
+                                case "Draw":
+                                    JOptionPane.showMessageDialog(panel, "Game tied!");
                             }
                             panel.repaint();
                         }
