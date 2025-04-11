@@ -7,6 +7,10 @@ import java.io.*;
 import java.net.Socket;
 import java.util.UUID;
 
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
 public class Client {
     private Socket socket;
     private ObjectOutputStream out;
@@ -14,9 +18,11 @@ public class Client {
     private String clientID;
     GamePanel panel;
 
+    private final Object lockWaiter = new Object();
+    private volatile boolean lockGranted = false;
     public Client(GamePanel panel) throws IOException {
         this.panel = panel;
-        this.socket = new Socket("127.0.0.1", 53333);
+        this.socket = new Socket("192.168.1.246", 53333);
         this.clientID = UUID.randomUUID().toString();
         this.out = new ObjectOutputStream(socket.getOutputStream());
         this.in = new ObjectInputStream(socket.getInputStream());
@@ -64,8 +70,16 @@ public class Client {
                             }
                         });
                     }
-                    else if (msg.getType().equals("Request")) {
-                       System.out.println("Hello:"+msg);
+                    else if (msg.getType().equals("LockGranted")) {
+                        lockGranted = true;
+                        synchronized (lockWaiter) {
+                            lockWaiter.notify();
+                        }
+                    } else if (msg.getType().equals("LockDenied")) {
+                        lockGranted = false;
+                        synchronized (lockWaiter) {
+                            lockWaiter.notify();
+                        }
                     }
                 }
 
@@ -74,6 +88,23 @@ public class Client {
             System.err.println("Server connection closed or error: " + e.getMessage());
         }
     }
+
+    public boolean requestLockAndWait(int row, int col, Point pixel) {
+        lockGranted = false;
+        MessageToSend requestMsg = new MessageToSend(row, col, pixel, Color.BLACK, "Request", this.clientID);
+        sendMessage(requestMsg);
+
+        synchronized (lockWaiter) {
+            try {
+                lockWaiter.wait(1000); // wait up to 1 second
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return lockGranted;
+    }
+
 
     public void close() {
         try {

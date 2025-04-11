@@ -62,4 +62,8 @@ public class MessageToSend implements Serializable {
     public void setSenderID(String senderID) {
         this.senderID = senderID;
     }
+
+    public String getSenderID() {
+        return senderID;
+    }
 }

@@ -1,6 +1,7 @@
 package network;
 
 import java.io.*;
+import java.net.IDN;
 import java.net.Socket;
 
 public class ClientHandler implements Runnable {
@@ -8,6 +9,7 @@ public class ClientHandler implements Runnable {
     ObjectInputStream in = null;
     ObjectOutputStream out = null;
     private final Server server;
+    private String clientId;
 
     public ClientHandler(Socket socket, Server server) {
         this.socket = socket;
@@ -39,6 +41,7 @@ public class ClientHandler implements Runnable {
             while ((obj = in.readObject()) != null) {
                 if (obj instanceof MessageToSend message) {
                     System.out.println("Received message: " + message);
+                    this.clientId = message.getSenderID();
 //                    System.out.println(message.pixel.x + message.pixel.y);
                     out.writeObject("Received your message!");
                     server.broadcast(message);
@@ -57,5 +60,9 @@ public class ClientHandler implements Runnable {
             server.remove(this);
             System.out.println("Client disconnected: " + socket.getInetAddress());
         }
+    }
+
+    public String getClientID() {
+        return clientId;
     }
 }

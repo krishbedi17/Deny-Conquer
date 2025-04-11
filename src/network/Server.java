@@ -33,8 +33,30 @@ public class Server {
     }
 
     public void broadcast(MessageToSend message) {
+        if (message.getType().equals("Request")) {
+            Cell requestedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
+            if (requestedCell != null && requestedCell.tryLock()) {
+                // Lock acquired — send confirmation only to sender
+                message.setType("LockGranted");
+                sendToClient(message.getSenderID(), message);
+            } else {
+                // Lock not acquired — deny request
+                message.setType("LockDenied");
+                sendToClient(message.getSenderID(), message);
+            }
+            return;
+        }
         for (ClientHandler client : clients) {
             client.send(message);
+        }
+    }
+
+    public void sendToClient(String clientID, MessageToSend msg) {
+        for (ClientHandler client : clients) {
+            if (client.getClientID().equals(clientID)) {
+                client.send(msg);
+                break;
+            }
         }
     }
 

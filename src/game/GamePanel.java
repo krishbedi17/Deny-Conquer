@@ -11,7 +11,7 @@ import java.io.IOException;
 public class GamePanel extends JPanel implements MouseListener, MouseMotionListener {
     private final GameBoard board;
     private Cell cellBeingDrawnOn = null;
-    private final Color playerColor = Color.RED; // Placeholder for player 1 color
+    private final Color playerColor = Color.BLUE; // Placeholder for player 1 color
     MessageToSend lastMsg;
     MessageToSend requestMsg;
 
@@ -34,6 +34,12 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     @Override
     public void mousePressed(MouseEvent e) {
+
+        boolean gotLock = player.requestLockAndWait(e.getX()/50, e.getY()/50, new Point(e.getX(), e.getY()));
+        if (!gotLock) {
+            System.out.println("Cell lock denied — input blocked.");
+            return;
+        }
         Cell cell = board.getCellAtPixel(e.getX(), e.getY());
         requestMsg = new MessageToSend(e.getX()/50, e.getY()/50, new Point(e.getX(), e.getY()), Color.BLACK, "Request","-1");
         player.sendMessage(requestMsg);

@@ -4,11 +4,13 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Cell {
     Color colorOfCell = Color.WHITE;
     boolean isClaimed = false;
     boolean isBeingClaimed = false;
+    private final ReentrantLock lock = new ReentrantLock();
 
     Point locOnCanvas;
     BufferedImage drawing = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
@@ -33,6 +35,13 @@ public class Cell {
         g.drawRect(x, y, 50, 50);
     }
 
+    public boolean tryLock() {
+        return lock.tryLock();
+    }
+
+    public void unlock() {
+        lock.unlock();
+    }
 
     public boolean isClaimed() {
         return isClaimed;
