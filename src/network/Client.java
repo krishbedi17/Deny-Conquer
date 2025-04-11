@@ -113,4 +113,10 @@ public class Client {
             // Ignore
         }
     }
+
+    public boolean getLockGranted() {
+        return this.lockGranted;
+    }
+
+
 }

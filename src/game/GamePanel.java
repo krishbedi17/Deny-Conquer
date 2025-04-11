@@ -99,8 +99,8 @@ public class GamePanel extends JPanel {
                 statusLabel.setText("Cell lock granted. Start filling...");
             }
             // Send a lock request message.
-            MessageToSend requestMsg = new MessageToSend(row, col, new Point(e.getX(), e.getY()), Color.BLACK, "Request", "-1");
-            player.sendMessage(requestMsg);
+//            MessageToSend requestMsg = new MessageToSend(row, col, new Point(e.getX(), e.getY()), Color.BLACK, "Request", "-1");
+//            player.sendMessage(requestMsg);
 
             Cell cell = board.getCellAtPixel(e.getX(), e.getY());
             if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
@@ -119,7 +119,11 @@ public class GamePanel extends JPanel {
 
         @Override
         public void mouseReleased(MouseEvent e) {
+            if (!player.getLockGranted()) {
+                return;
+            }
             if (cellBeingDrawnOn != null) {
+                System.out.println("Inside mouse released");
                 boolean filled = cellBeingDrawnOn.checkIfValidFill(playerColor);
                 cellBeingDrawnOn = null;
                 repaint();

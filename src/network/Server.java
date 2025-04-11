@@ -47,6 +47,15 @@ public class Server {
             }
             return;
         }
+
+        else if (message.getType().equals("Release")) {
+            // chcek that release is only possible when ;ock is granted
+            Cell releasedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
+            if (releasedCell != null) {
+                releasedCell.unlock();
+            }
+        }
+
         for (ClientHandler client : clients) {
             client.send(message);
         }
