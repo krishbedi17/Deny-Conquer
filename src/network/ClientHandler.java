@@ -17,7 +17,7 @@ public class ClientHandler implements Runnable {
         this.server = server;
     }
 
-    public void send(Object obj) {
+    public synchronized void send(Object obj) {
         try {
             if (out != null) {
                 out.writeObject(obj);
@@ -31,8 +31,10 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
-            in = new ObjectInputStream(socket.getInputStream());
+           
             out = new ObjectOutputStream(socket.getOutputStream());
+            out.flush(); // Ensure the stream header is sent
+            in = new ObjectInputStream(socket.getInputStream());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -42,13 +44,16 @@ public class ClientHandler implements Runnable {
             while ((obj = in.readObject()) != null) {
                 if (obj instanceof MessageToSend message) {
 
-                    if (count == 0) {this.clientId = message.getSenderID();}
+                    if (clientId == null) {
+                        clientId = message.getSenderID(); // Set clientId from the first message
+                    }
 //                    System.out.println(message.pixel.x + message.pixel.y);
 //                    out.writeObject("Received your message!");
                     if (message.getType().equals("RequestLock")) {
                         System.out.println("Received message: " + message.getType());
                         server.grantLock(message);
                     } else if (message.getType().equals("NotFilled")) {
+                        System.out.println("Received message: " + message.getType());
                         server.unlockCell(message.getRow(), message.getCol());
                         server.broadcast(message);
                     }

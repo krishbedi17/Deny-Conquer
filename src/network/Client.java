@@ -25,13 +25,14 @@ public class Client {
         this.socket = new Socket("127.0.0.1", 53333);
         this.clientID = UUID.randomUUID().toString();
         this.out = new ObjectOutputStream(socket.getOutputStream());
+        this.out.flush(); // Ensure the stream header is sent
         this.in = new ObjectInputStream(socket.getInputStream());
 
         // Optional: listen for server messages in another thread
         new Thread(this::listenToServer).start();
     }
 
-    public void sendMessage(MessageToSend msg) {
+    public synchronized void sendMessage(MessageToSend msg) {
         try {
             msg.setSenderID(clientID);
             out.writeObject(msg);
@@ -115,7 +116,9 @@ public class Client {
 
             long start = System.currentTimeMillis();
             try {
-                lockWaiter.wait(1000); // wait up to 1 second
+                while (!lockGranted && (System.currentTimeMillis() - start) < 1000) {
+                    lockWaiter.wait(1000); // Wait up to 1 second
+                }
             } catch (InterruptedException e) {
                 System.err.println("Lock wait interrupted: " + e.getMessage());
             }
