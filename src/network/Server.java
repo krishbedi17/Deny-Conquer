@@ -13,7 +13,8 @@ public class Server {
     private ServerSocket serverSocket;
     private final ArrayList<ClientHandler> clients = new ArrayList<>();
     private final GameBoard board;
-    private final Map<String, String> cellLocks = new HashMap<>(); // Map of cell locks (key: "row,col", value: player ID)
+    private final boolean[][] lockedCells = new boolean[4][4]; // match your board size (4x4)
+
 
     public Server() throws IOException {
         serverSocket = new ServerSocket(53333);
@@ -32,27 +33,37 @@ public class Server {
         }
     }
 
-    public synchronized boolean lockCell(int row, int col, String playerId) {
-        String key = row + "," + col;
-        if (cellLocks.containsKey(key)) {
-            return false; // Cell is already locked
+
+    public synchronized void broadcast(MessageToSend message) {
+        int row = message.getRow();
+        int col = message.getCol();
+
+        switch (message.getType()) {
+            case "Lock":
+                if (!lockedCells[row][col]) {
+                    lockedCells[row][col] = true;
+                    for (ClientHandler client : clients) {
+                        client.send(message);
+                    }
+                } // else: ignore or notify requesting client it failed to lock
+                break;
+
+            case "Unlock":
+            case "Filled":
+                lockedCells[row][col] = false;
+                for (ClientHandler client : clients) {
+                    client.send(message);
+                }
+                break;
+
+            default:
+                for (ClientHandler client : clients) {
+                    client.send(message);
+                }
+                break;
         }
-        cellLocks.put(key, playerId);
-        return true;
     }
 
-    public synchronized void unlockCell(int row, int col, String playerId) {
-        String key = row + "," + col;
-        if (cellLocks.get(key).equals(playerId)) {
-            cellLocks.remove(key);
-        }
-    }
-
-    public void broadcast(MessageToSend message) {
-        for (ClientHandler client : clients) {
-            client.send(message);
-        }
-    }
 
     public void remove(ClientHandler client) {
         clients.remove(client);
