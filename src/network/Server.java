@@ -33,7 +33,6 @@ public class Server {
         }
     }
 
-
     public synchronized void broadcast(MessageToSend message) {
         int row = message.getRow();
         int col = message.getCol();
