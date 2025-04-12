@@ -6,22 +6,22 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class Cell {
-    Color colorOfCell = Color.WHITE;
+    Color cellColor = Color.WHITE;
     boolean isClaimed = false;
     boolean isBeingClaimed = false;
-
-    Point locOnCanvas;
+    Point startPoint;
     BufferedImage drawing = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
 
     private final Set<Point> pixelSet = new HashSet<>();
 
     public Cell(int x, int y) {
-        locOnCanvas = new Point(x, y);
+        startPoint = new Point(x, y);
     }
+
 
     public void draw(Graphics g, int x, int y) {
         if (isClaimed) {
-            g.setColor(colorOfCell);
+            g.setColor(cellColor);
             g.fillRect(x, y, 50, 50);
         } else {
             g.setColor(Color.WHITE);
@@ -29,7 +29,6 @@ public class Cell {
             g.drawImage(drawing, x, y, null);
         }
 
-        // Draw a border with a different color if the cell is being claimed
         if (isBeingClaimed) {
             g.setColor(Color.RED);
             g.drawRect(x, y, 50, 50);
@@ -47,7 +46,7 @@ public class Cell {
     public void setClaimed(boolean claimed, Color claimColor) {
         this.isClaimed = claimed;
         if (claimed) {
-            this.colorOfCell = claimColor;
+            this.cellColor = claimColor;
         }
     }
 
@@ -73,7 +72,7 @@ public class Cell {
         System.out.println("Checking fill — pixelSet size: " + pixelSet.size());
 
         if (pixelSet.size() >= 125) {
-            colorOfCell = playerColor;
+            this.cellColor = playerColor;
             isClaimed = true;
             System.out.println("Cell Valid");
             return true;
@@ -93,7 +92,14 @@ public class Cell {
         isBeingClaimed = false;
     }
 
+    public void fillCell(int x,int y,Color color){
+        Graphics2D g = drawing.createGraphics();
+        g.setColor(color);
+        g.fillRect(x, y, 50, 50);
+    }
+
+
     public Color getColorOfCell(){
-        return this.colorOfCell;
+        return this.cellColor;
     }
 }

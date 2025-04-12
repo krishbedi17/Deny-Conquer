@@ -46,6 +46,15 @@ public class GameBoard {
         return this.rows;
     }
 
+    public void setCellisBeingClaimed(int row,int col){
+        gameBoard[row][col].setBeingClaimed(true);
+    }
+
+    public void setGameBoardElem(int row, int col, Cell cell){
+        gameBoard[row][col] = cell;
+    }
+
+
 //    public boolean allCellsClaimed() {
 //        for (Cell[] row : grid) {
 //            for (Cell cell : row) {

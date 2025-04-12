@@ -24,7 +24,7 @@ public class GameFrame extends JFrame {
         Color selectedColor = userSelection.getColor();
 
         // Create the game panel
-        GamePanel gamePanel = new GamePanel(selectedColor, username);
+        gamePanel gamePanel = new gamePanel(selectedColor, username);
 
         // Create the status panel
         statusLabel = new JLabel("Welcome, " + username + "! Choose a cell to begin.");

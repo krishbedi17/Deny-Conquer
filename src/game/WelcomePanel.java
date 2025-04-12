@@ -53,7 +53,7 @@ public class WelcomePanel {
 
         return new UserSelection(username, chosenColor);
     }
-     public static class UserSelection {
+    public static class UserSelection {
         private final String username;
         private final Color color;
 
