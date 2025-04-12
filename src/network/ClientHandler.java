@@ -39,9 +39,21 @@ public class ClientHandler implements Runnable {
             while ((obj = in.readObject()) != null) {
                 if (obj instanceof MessageToSend message) {
                     System.out.println("Received message: " + message);
-//                    System.out.println(message.pixel.x + message.pixel.y);
-                    out.writeObject("Received your message!");
-                    server.broadcast(message);
+
+                    if (message.getType().equals("Lock")) {
+                        boolean success = server.lockCell(message.getRow(), message.getCol(), socket.getInetAddress().toString());
+                        if (!success) {
+                            // Notify the client that the cell is already locked
+                            MessageToSend rejectMsg = new MessageToSend(message.getRow(), message.getCol(), null, message.getPlayerColor(), "Reject");
+                            send(rejectMsg);
+                            continue;
+                        }
+                    } else if (message.getType().equals("Unlock") || message.getType().equals("Filled")) {
+                        // Unlock the cell when the player releases or claims it
+                        server.unlockCell(message.getRow(), message.getCol(), socket.getInetAddress().toString());
+                    }
+
+                    server.broadcast(message); // Broadcast the message to all clients
                 }
             }
         } catch (EOFException e) {

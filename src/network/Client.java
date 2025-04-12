@@ -43,30 +43,34 @@ public class Client {
                     System.out.println("Received message of type: " + msg.getType());
 
                     SwingUtilities.invokeLater(() -> {
+                        if (msg.getType().equals("Reject")) {
+                            JOptionPane.showMessageDialog(panel, "Cell is already locked by another player!");
+                            return;
+                        }
+
                         Cell cell = panel.getCell(msg.row, msg.col);
                         if (cell != null) {
                             switch (msg.getType()) {
                                 case "Lock":
                                     cell.setBeingClaimed(true);
                                     break;
-
                                 case "Scribble":
                                     cell.addDrawnPixel(msg.getPixel().x % 50, msg.getPixel().y % 50, msg.getPlayerColor());
                                     break;
-
                                 case "Filled":
                                     cell.setBeingClaimed(false);
                                     cell.setClaimed(true, msg.getPlayerColor());
                                     break;
-
                                 case "Unlock":
                                     cell.setBeingClaimed(false);
                                     cell.clearDrawing();
                                     break;
                                 case "GameOver":
                                     JOptionPane.showMessageDialog(panel, WelcomePanel.getColorName(msg.getPlayerColor()) + " wins the game!");
+                                    break;
                                 case "Draw":
                                     JOptionPane.showMessageDialog(panel, "Game tied!");
+                                    break;
                             }
                             panel.repaint();
                         }
@@ -76,7 +80,6 @@ public class Client {
         } catch (EOFException e) {
             System.err.println("Server closed the connection");
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("Error in server communication: " + e.getMessage());
             e.printStackTrace();
         }
     }
