@@ -1,0 +1,970 @@
+===== src/Main.java =====
+//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
+// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+public class Main {
+    public static void main(String[] args) {
+        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
+        // to see how IntelliJ IDEA suggests fixing it.
+        System.out.printf("Hello and welcome!");
+
+        for (int i = 1; i <= 5; i++) {
+            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
+            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
+            System.out.println("i = " + i);
+        }
+    }
+}
+
+===== src/server/clientHandler.java =====
+package server;
+
+import Client.MessageToSend;
+import game.Cell;
+import game.GameBoard;
+import game.WelcomePanel;
+
+import java.awt.*;
+import java.io.*;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
+
+import static game.WelcomePanel.getColorFromName;
+import static game.WelcomePanel.getColorName;
+
+public class clientHandler implements Runnable {
+    private final Socket socket;
+    ObjectInputStream in = null;
+    ObjectOutputStream out = null;
+    private final server server;
+    private String clientId = null;
+    public clientHandler(Socket socket, server server) {
+        this.socket = socket;
+        this.server = server;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void send(Object obj) {
+        try {
+            if (out != null) {
+                out.writeObject(obj);
+                out.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    private void handleRequestMsg(int row, int col,MessageToSend msg){
+        boolean cell = server.getCellLock(row, col);
+        MessageToSend reply = new MessageToSend(msg.getRow(), msg.getCol(),
+                msg.getPixel(),msg.getPlayerColor(),"",msg.getClientID());
+        if(!cell){//if cell is not locked
+            server.setCellLock(row,col,true);
+            //give access to client
+           reply.setType("LockGranted");
+        }
+        else{
+            //if cell is locked
+            //deny access to client
+            reply.setType("LockDenied");
+        }
+        server.sendToClient(reply.getClientID(),reply);
+    }
+
+    private void handleUnlockMsg(int row,int col,MessageToSend msg){
+        server.setCellLock(row,col,false);
+        msg.setType("UnlockClient");
+        server.broadcast(msg);
+//        server.sendToClient(msg.getClientID(),
+    }
+
+    private void handleFilledMsg(int row,int col,MessageToSend msg){
+        Point point = new Point(msg.getRow()*50, msg.getCol()*50);
+        Cell cell = new Cell(point.x, point.y);
+        cell.setClaimed(true,msg.getPlayerColor());
+        server.setGameBoardCell(row,col,cell);
+    }
+
+    public String checkWinCondition() {
+        GameBoard board = server.getBoard();
+        HashMap<String, Integer> colorCounts = new HashMap<>();
+        for (int row = 0; row < board.getBoardSize(); row++) {
+            for (int col = 0; col < board.getBoardSize(); col++) {
+                Cell cell = board.getCellByRowAndCol(row, col);
+                Color color = cell.getColorOfCell();
+                String colorName = WelcomePanel.getColorName(color);
+                if (colorName.equalsIgnoreCase("WHITE")) {
+                    return null;
+                }
+                colorCounts.put(colorName, colorCounts.getOrDefault(colorName, 0) + 1);
+            }
+        }
+
+        String winner = null;
+        int maxCount = 0;
+        boolean tie = false;
+
+        for (Map.Entry<String, Integer> entry : colorCounts.entrySet()) {
+            if (entry.getValue() > maxCount) {
+                winner = entry.getKey();
+                maxCount = entry.getValue();
+                tie = false;
+            } else if (entry.getValue() == maxCount) {
+                tie = true; // Found a tie
+            }
+        }
+
+        if (tie) {
+            return "Draw";
+        }
+        return winner;
+    }
+
+    @Override
+    public void run() {
+        try {
+            in = new ObjectInputStream(socket.getInputStream());
+            out = new ObjectOutputStream(socket.getOutputStream());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            Object obj;
+            while ((obj = in.readObject()) != null) {
+                if (obj instanceof MessageToSend message) {
+                    System.out.println("Received message: " + message);
+//                    System.out.println(message.pixel.x + message.pixel.y);
+                    out.writeObject("Received your message!");
+//                    server.broadcast(message);
+                    if(this.clientId == null){
+                        this.clientId = message.getClientID();
+                    }
+                    switch (message.getType()) {
+                        case "RequestLock":
+                            handleRequestMsg(message.getRow(), message.getCol(),message);
+                            break;
+                        case "Unlock":
+                            handleUnlockMsg(message.getRow(), message.getCol(),message);
+                            break;
+                        case "Filled":
+                            handleFilledMsg(message.getRow(), message.getCol(),message);
+                            String color = checkWinCondition();
+
+                            if (color != null && color.equals("Draw")) {
+                                MessageToSend winMsg = new MessageToSend(0, 0, new Point(0, 0), Color.WHITE, "Draw", message.getClientID());
+                                server.broadcast(winMsg);
+                                return;
+                            }
+
+                            if (color != null) {
+                                Color winnerColor = WelcomePanel.getColorFromName(color);
+                                MessageToSend winMsg = new MessageToSend(0, 0, new Point(0, 0), winnerColor, "GameOver", message.getClientID());
+                                server.broadcast(winMsg);
+                            }
+                            break;
+                        case "Scribble":
+                            server.broadcast(message);
+                            break;
+                    }
+                }
+            }
+        } catch (EOFException e) {
+            // Client closed connection
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+            server.remove(this);
+            System.out.println("Client disconnected: " + socket.getInetAddress());
+        }
+    }
+}
+
+===== src/server/server.java =====
+package server;
+
+import game.*;
+import Client.MessageToSend;
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+
+public class server {
+    private ServerSocket serverSocket;
+    private final ArrayList<clientHandler> clients = new ArrayList<>();
+    GameBoard board;
+    private boolean[][] cellLockArray = new boolean[8][8];
+
+    public server() throws IOException {
+        serverSocket = new ServerSocket(53333);
+        board = new GameBoard();
+        System.out.println("Server started on port 53333");
+    }
+
+    public GameBoard getBoard() {
+        return board;
+    }
+    public boolean getCellLock(int row,int col){
+        return cellLockArray[row][col];
+    }
+
+    public void setCellLock(int row,int col,boolean bool){
+        cellLockArray[row][col] = bool;
+    }
+
+    public void setGameBoardCell(int row, int col,Cell cell){
+        board.setGameBoardElem(row,col,cell);
+    }
+
+    public void start() throws IOException {
+        while (true) {
+            Socket socket = serverSocket.accept();
+            System.out.println("New client connected: " + socket.getInetAddress());
+
+            clientHandler handler = new clientHandler(socket, this);  // Pass server reference if needed
+            clients.add(handler);
+            new Thread(handler).start();
+        }
+    }
+
+    public void broadcast(MessageToSend message) {
+        for (clientHandler client : clients) {
+            client.send(message);
+        }
+    }
+    public void sendToClient(String clientID, MessageToSend msg) {
+        for (clientHandler client : clients) {
+            if (client.getClientId().equals(clientID)) {
+                client.send(msg);
+                break;
+            }
+        }
+    }
+    public void remove(clientHandler client) {
+        clients.remove(client);
+    }
+
+    public static void main(String[] args) {
+        try {
+            server server = new server();
+            server.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+===== src/game/WelcomePanel.java =====
+package game;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class WelcomePanel {
+    public static UserSelection showDialog(Component parent) {
+        // 1. Ask for username
+        String username = JOptionPane.showInputDialog(
+                parent,
+                "Enter your username:",
+                "Username",
+                JOptionPane.PLAIN_MESSAGE
+        );
+        if (username == null || username.trim().isEmpty()) {
+            username = "Guest";
+        }
+
+        // 2. Show the game rules
+        String rules = "Game Rules:\n" +
+                "1. Claim a cell by drawing within it.\n" +
+                "2. Only one cell can be claimed at a time.\n" +
+                "3. Use your selected color to mark your territory.\n" +
+                "4. The game ends when all cells are claimed.\n" +
+                "5. The player with the most claimed cells wins!";
+        JOptionPane.showMessageDialog(
+                parent,
+                rules,
+                "Game Rules",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+
+        // 3. Provide a list of 5 colors to choose from
+        String[] colorNames = {"Green", "Red", "Blue", "Orange", "Magenta"};
+        Color[] colors = {Color.GREEN, Color.RED, Color.BLUE, Color.ORANGE, Color.MAGENTA};
+        String chosenColorName = (String) JOptionPane.showInputDialog(
+                parent,
+                "Choose Your Player Color:",
+                "Color Selection",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                colorNames,
+                colorNames[0]
+        );
+
+        Color chosenColor = Color.GRAY;
+        for (int i = 0; i < colorNames.length; i++) {
+            if (colorNames[i].equals(chosenColorName)) {
+                chosenColor = colors[i];
+                break;
+            }
+        }
+
+        return new UserSelection(username, chosenColor);
+    }
+    public static class UserSelection {
+        private final String username;
+        private final Color color;
+
+        public UserSelection(String username, Color color) {
+            this.username = username;
+            this.color = color;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public Color getColor() {
+            return color;
+        }
+    }
+
+    public static String getColorName(Color color) {
+        if (color.equals(Color.RED)) return "RED";
+        if (color.equals(Color.BLUE)) return "BLUE";
+        if (color.equals(Color.GREEN)) return "GREEN";
+        if (color.equals(Color.ORANGE)) return "ORANGE";
+        if (color.equals(Color.MAGENTA)) return "MAGENTA";
+        if (color.equals(Color.WHITE)) return "WHITE";
+        return "UNKNOWN";
+    }
+    public static Color getColorFromName(String name) {
+        switch (name.toUpperCase()) {
+            case "RED": return Color.RED;
+            case "BLUE": return Color.BLUE;
+            case "GREEN": return Color.GREEN;
+            case "ORANGE": return Color.ORANGE;
+            case "MAGENTA": return Color.MAGENTA;
+            case "WHITE": return Color.WHITE;
+            default: return Color.GRAY;
+        }
+    }
+}
+
+===== src/game/GameFrame.java =====
+package game;
+
+import javax.swing.*;
+import java.awt.*;
+import java.io.IOException;
+import com.formdev.flatlaf.FlatLightLaf;
+
+public class GameFrame extends JFrame {
+    private JLabel statusLabel;
+
+    public GameFrame() throws IOException {
+        setTitle("Deny and Conquer");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(false);
+
+        FlatLightLaf.setup();
+
+        UIManager.put("Label.font", new Font("SansSerif", Font.PLAIN, 14));
+        UIManager.put("Button.font", new Font("SansSerif", Font.PLAIN, 14));
+
+        // Show the dialog for username and color selection
+        WelcomePanel.UserSelection userSelection = WelcomePanel.showDialog(this);
+        String username = userSelection.getUsername();
+        Color selectedColor = userSelection.getColor();
+
+        // Create the game panel
+        gamePanel gamePanel = new gamePanel(selectedColor, username);
+
+        // Create the status panel
+        statusLabel = new JLabel("Welcome, " + username + "! Choose a cell to begin.");
+        JPanel statusPanel = new JPanel(new BorderLayout());
+        statusPanel.add(statusLabel, BorderLayout.CENTER);
+        statusPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+
+        // Add game panel and status panel to the frame
+        add(gamePanel, BorderLayout.CENTER);
+        add(statusPanel, BorderLayout.SOUTH);
+
+        // Set the status label in the game panel for interaction
+        gamePanel.setStatusLabel(statusLabel);
+
+        pack();
+        setLocationRelativeTo(null); // Center window
+        setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                new GameFrame();
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(null, "Could not connect to server:\n" + e.getMessage(),
+                        "Connection Error", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
+        });
+    }
+}
+
+===== src/game/GameBoard.java =====
+package game;
+
+import java.awt.*;
+
+public class GameBoard {
+    private final int rows = 8;
+    private final int cols = 8;
+    private final Cell[][] gameBoard;
+    private final int cellSize = 50;
+
+    public GameBoard() {
+        gameBoard = new Cell[rows][cols];
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                gameBoard[row][col] = new Cell(col * 50, row * 50);
+            }
+        }
+    }
+
+    public void drawBoard(Graphics2D g) {
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                int x = col * cellSize;
+                int y = row * cellSize;
+                gameBoard[row][col].draw(g, x, y);
+
+            }
+        }
+    }
+
+    public Cell getCellAtPixel(int x, int y) {
+        int col = x / cellSize;
+        int row = y / cellSize;
+
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
+            return gameBoard[row][col];
+        }
+        return null;
+    }
+
+    public Cell getCellByRowAndCol(int row, int col) {
+        return gameBoard[row][col];
+    }
+
+    public int getBoardSize(){
+        return this.rows;
+    }
+
+    public void setCellisBeingClaimed(int row,int col){
+        gameBoard[row][col].setBeingClaimed(true);
+    }
+
+    public void setGameBoardElem(int row, int col, Cell cell){
+        gameBoard[row][col] = cell;
+    }
+
+
+//    public boolean allCellsClaimed() {
+//        for (Cell[] row : grid) {
+//            for (Cell cell : row) {
+//                if (!cell.isClaimed()) {
+//                    return false;
+//                }
+//            }
+//        }
+//        return true;
+//    }
+//
+//    public int countOwnedByColor(Color color) {
+//        int count = 0;
+//        for (Cell[] row : grid) {
+//            for (Cell cell : row) {
+//                if (cell.getOwnerColor().equals(color)) {
+//                    count++;
+//                }
+//            }
+//        }
+//        return count;
+//    }
+}
+
+===== src/game/gamePanel.java =====
+package game;
+
+import Client.MessageToSend;
+import Client.client;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
+
+public class gamePanel extends JPanel implements MouseListener, MouseMotionListener {
+    private final GameBoard board;
+    private Cell cellBeingDrawnOn = null;
+    private Color playerColor;
+    private final String username;
+    private JLabel statusLabel; // Reference to the status label
+    MessageToSend Msg;
+    private int currentCellRow = -1;
+    private int currentCellCol = -1;
+
+    client player;
+    public gamePanel(Color selectedColor, String username) throws IOException {
+        this.board = new GameBoard();
+        playerColor = selectedColor;
+        this.player = new client(this);
+        this.username = username;
+        setPreferredSize(new Dimension(50 * 8, 50 * 8));
+        addMouseListener(this);
+        addMouseMotionListener(this);
+    }
+
+    public JLabel getStatusLabel() {
+        return statusLabel;
+    }
+
+    public void setStatusLabel(JLabel statusLabel) {
+        this.statusLabel = statusLabel;
+    }
+
+    public void setCellBeingDrawnOn(Cell cellBeingDrawnOn) {
+        this.cellBeingDrawnOn = cellBeingDrawnOn;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public int getCurrentCellRow() {
+        return currentCellRow;
+    }
+
+    public int getCurrentCellCol() {
+        return currentCellCol;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        board.drawBoard((Graphics2D) g);
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        //check lock
+        currentCellRow = e.getY() / 50;
+        currentCellCol = e.getX() / 50;
+        Msg = new MessageToSend(currentCellRow,currentCellCol,new Point(e.getX(),e.getY()),Color.GRAY,"RequestLock",player.getClientID());
+        player.sendMessage(Msg);
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        //check lock
+        //if granted lock then proceed
+        //else give error
+        drawPixel(cellBeingDrawnOn, e.getX(), e.getY(), playerColor);
+    }
+
+    public void drawPixel(Cell cell, int pixelX, int pixelY, Color color) {
+        if (cell != null && cell.isBeingClaimed() && !cell.isClaimed()) {
+            if (checkIfStillInsideCell(cell, pixelX, pixelY)) {
+                int x = pixelX % 50;
+                int y = pixelY % 50;
+                cell.addDrawnPixel(x, y, color);
+                repaint();
+
+                // Make sure to use the stored row and column
+                Msg = new MessageToSend(currentCellRow, currentCellCol, new Point(pixelX, pixelY), color, "Scribble",player.getClientID());
+                player.sendMessage(Msg);
+
+                // Update the status label
+                if (statusLabel != null) {
+                    statusLabel.setText(username + " is drawing on the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + ").");
+                }
+            }
+        }
+    }
+
+    private boolean checkIfStillInsideCell(Cell cell, int x, int y) {
+        Point startPoint = cell.startPoint;
+        boolean flagX = (startPoint.x <= x && startPoint.x + 50 > x);
+        boolean flagY = (startPoint.y <= y && startPoint.y + 50 > y);
+        return (flagX && flagY);
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        if (cellBeingDrawnOn != null) {
+            boolean filled = cellBeingDrawnOn.checkIfValidFill(playerColor);
+
+            String messageType = filled ? "Filled" : "Unlock";
+            MessageToSend releaseMsg = new MessageToSend(currentCellRow, currentCellCol,
+                    new Point(e.getX() % 50, e.getY() % 50),
+                    playerColor, messageType,player.getClientID());
+            player.sendMessage(releaseMsg);
+
+            // Update the status label
+            if (statusLabel != null) {
+                if (filled) {
+                    statusLabel.setText(username + " successfully claimed the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + ")!");
+                } else {
+                    statusLabel.setText(username + " released the cell at (" + (currentCellRow + 1) + ", " + (currentCellCol + 1) + ").");
+                }
+            }
+
+            cellBeingDrawnOn = null;
+            currentCellRow = -1;
+            currentCellCol = -1;
+            repaint();
+        }
+    }
+
+    // Unused events
+    public void mouseClicked(MouseEvent e) {
+    }
+
+    public void mouseEntered(MouseEvent e) {
+    }
+
+    public void mouseExited(MouseEvent e) {
+    }
+
+    public void mouseMoved(MouseEvent e) {
+    }
+
+    public Cell getCell(int row, int col) {
+        return board.getCellByRowAndCol(row, col);
+    }
+}
+
+
+===== src/game/Cell.java =====
+package game;
+
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.HashSet;
+import java.util.Set;
+
+public class Cell {
+    Color cellColor = Color.WHITE;
+    boolean isClaimed = false;
+    boolean isBeingClaimed = false;
+    Point startPoint;
+    BufferedImage drawing = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
+
+    private final Set<Point> pixelSet = new HashSet<>();
+
+    public Cell(int x, int y) {
+        startPoint = new Point(x, y);
+    }
+
+
+    public void draw(Graphics g, int x, int y) {
+        if (isClaimed) {
+            g.setColor(cellColor);
+            g.fillRect(x, y, 50, 50);
+        } else {
+            g.setColor(Color.WHITE);
+            g.fillRect(x, y, 50, 50);
+            g.drawImage(drawing, x, y, null);
+        }
+
+        if (isBeingClaimed) {
+            g.setColor(Color.RED);
+            g.drawRect(x, y, 50, 50);
+            g.drawRect(x+1, y+1, 48, 48);
+        } else {
+            g.setColor(Color.BLACK);
+            g.drawRect(x, y, 50, 50);
+        }
+    }
+
+    public boolean isClaimed() {
+        return isClaimed;
+    }
+
+    public void setClaimed(boolean claimed, Color claimColor) {
+        this.isClaimed = claimed;
+        if (claimed) {
+            this.cellColor = claimColor;
+        }
+    }
+
+    public boolean isBeingClaimed() {
+        return isBeingClaimed;
+    }
+
+    public void setBeingClaimed(boolean flag) {
+        isBeingClaimed = flag;
+    }
+
+    public void addDrawnPixel(int x, int y, Color playerColor) {
+        if (isClaimed) return;
+
+        pixelSet.add(new Point(x, y));
+        Graphics2D g2d = drawing.createGraphics();
+        g2d.setColor(playerColor);
+        g2d.fillRect(x, y, 2, 2);
+        g2d.dispose();
+    }
+
+    public boolean checkIfValidFill(Color playerColor) {
+        System.out.println("Checking fill — pixelSet size: " + pixelSet.size());
+
+        if (pixelSet.size() >= 125) {
+            this.cellColor = playerColor;
+            isClaimed = true;
+            System.out.println("Cell Valid");
+            return true;
+        } else {
+            clearDrawing();
+            return false;
+        }
+    }
+
+    public void clearDrawing() {
+        Graphics2D g2d = drawing.createGraphics();
+        g2d.setComposite(AlphaComposite.Clear);
+        g2d.fillRect(0, 0, drawing.getWidth(), drawing.getHeight());
+        g2d.dispose();
+
+        pixelSet.clear();
+        isBeingClaimed = false;
+    }
+
+    public void fillCell(int x,int y,Color color){
+        Graphics2D g = drawing.createGraphics();
+        g.setColor(color);
+        g.fillRect(x, y, 50, 50);
+    }
+
+
+    public Color getColorOfCell(){
+        return this.cellColor;
+    }
+}
+
+===== src/Client/MessageToSend.java =====
+package Client;
+
+import java.awt.*;
+import java.io.Serializable;
+
+public class MessageToSend implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    int row, col;
+    SerializablePoint pixel; // Changed from Point to SerializablePoint
+    Color playerColor;
+    String type;
+    String clientID;
+
+    public MessageToSend(int row, int col, Point pixel, Color playerColor, String type,String clientID) {
+        this.row = row;
+        this.col = col;
+        this.pixel = new SerializablePoint(pixel.x, pixel.y); // Convert Point to SerializablePoint
+        this.playerColor = playerColor;
+        this.type = type;
+        this.clientID = clientID;
+    }
+
+    public String getClientID() {
+        return clientID;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public int getRow() {
+        return row;
+    }
+
+    public void setRow(int row) {
+        this.row = row;
+    }
+
+    public int getCol() {
+        return col;
+    }
+
+    public void setCol(int col) {
+        this.col = col;
+    }
+
+    public Point getPixel() {
+        return new Point(pixel.x, pixel.y); // Convert SerializablePoint back to Point
+    }
+
+    public void setPixel(Point pixel) {
+        this.pixel = new SerializablePoint(pixel.x, pixel.y);
+    }
+
+    public Color getPlayerColor() {
+        return playerColor;
+    }
+
+    public void setPlayerColor(Color playerColor) {
+        this.playerColor = playerColor;
+    }
+
+    // Inner class to make Point serializable
+    public static class SerializablePoint implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        int x, y;
+
+        public SerializablePoint(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+}
+
+===== src/Client/client.java =====
+package Client;
+
+import game.Cell;
+import game.gamePanel;
+import game.WelcomePanel;
+
+import javax.swing.*;
+import java.io.*;
+import java.net.Socket;
+import java.util.UUID;
+
+public class client {
+    private Socket socket;
+    private ObjectOutputStream out;
+    private ObjectInputStream in;
+
+    private String clientID;
+    private gamePanel panel;
+    public client(gamePanel panel) throws IOException {
+        this.socket = new Socket("127.0.0.1", 53333);
+        this.panel = panel;
+        this.out = new ObjectOutputStream(socket.getOutputStream());
+        this.in = new ObjectInputStream(socket.getInputStream());
+        this.clientID = UUID.randomUUID().toString();
+        // Optional: listen for server messages in another thread
+        new Thread(this::listenToServer).start();
+    }
+
+    public String getClientID() {
+        return clientID;
+    }
+
+    public void sendMessage(MessageToSend msg) {
+        try {
+            out.writeObject(msg);
+            out.flush();
+        } catch (IOException e) {
+            System.err.println("Error sending message: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void listenToServer() {
+        try {
+            while (true) {
+                Object response = in.readObject();
+
+                if (response instanceof MessageToSend msg) {
+                    System.out.println("Received message of type: " + msg.getType());
+
+                    SwingUtilities.invokeLater(() -> {
+                        Cell cell = panel.getCell(msg.row, msg.col);
+                        JLabel statusLabel = panel.getStatusLabel();
+                        String username = panel.getUsername();
+                        int currentRow = panel.getCurrentCellRow();
+                        int currentCol = panel.getCurrentCellCol();
+                        if (cell != null) {
+                            switch (msg.getType()) {
+                                case "LockGranted":
+                                    SwingUtilities.invokeLater(() -> {
+                                        if (cell != null) {
+                                            cell.setBeingClaimed(true);
+                                            panel.setCellBeingDrawnOn(cell);
+                                            panel.setCellBeingDrawnOn(cell);
+                                            panel.repaint();
+                                            if (statusLabel != null) {
+                                                statusLabel.setText(username + " locked the cell at (" + (currentRow + 1) + ", " + (currentCol + 1) + "). Start drawing!");
+                                        }}
+                                });
+                                    panel.repaint();
+                                    break;
+                                case "LockDenied":
+                                    SwingUtilities.invokeLater(() -> {
+                                        JOptionPane.showMessageDialog(panel, "Cell is already locked!");
+                                    });
+                                    if (statusLabel != null) {
+                                        statusLabel.setText("Cell is already claimed or being drawn on!");
+                                    }
+                                    panel.repaint();
+                                    break;
+                                case "Scribble":
+                                    cell.addDrawnPixel(msg.getPixel().x % 50, msg.getPixel().y % 50, msg.getPlayerColor());
+                                    panel.repaint();
+                                    break;
+                                case "Filled":
+                                    cell.setBeingClaimed(false);
+                                    cell.setClaimed(true, msg.getPlayerColor());
+                                    cell.fillCell(msg.getRow(),msg.getCol(),msg.getPlayerColor());
+                                    panel.repaint();
+                                    break;
+                                case "UnlockClient":
+                                    cell.setBeingClaimed(false);
+                                    cell.clearDrawing();
+                                    panel.repaint();
+                                    break;
+                                case "GameOver":
+                                    JOptionPane.showMessageDialog(panel, WelcomePanel.getColorName(msg.getPlayerColor()) + " wins the game!");
+                                case "Draw":
+                                    JOptionPane.showMessageDialog(panel, "Game tied!");
+                            }
+                            panel.repaint();
+                        }
+                    });
+                }
+            }
+        } catch (EOFException e) {
+            System.err.println("Server closed the connection");
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Error in server communication: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public void close() {
+        try {
+            socket.close();
+        } catch (IOException e) {
+            // Ignore
+        }
+    }
+}
+
