@@ -20,6 +20,9 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     private int currentCellRow = -1;
     private int currentCellCol = -1;
 
+    private boolean isWaitingForLock = false;
+    private boolean hasLock = false;
+
     Client player;
 
     public GamePanel(Color selectedColor, String username) throws IOException {
@@ -46,18 +49,32 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
     public void mousePressed(MouseEvent e) {
         Cell cell = board.getCellAtPixel(e.getX(), e.getY());
         if (cell != null && !cell.isClaimed() && !cell.isBeingClaimed()) {
-            cell.setBeingClaimed(true);
-            cellBeingDrawnOn = cell;
+
 
             // Store the current cell row and column
-            currentCellRow = e.getY() / 50;
-            currentCellCol = e.getX() / 50;
+            int row = e.getY() / 50;
+            int col = e.getX() / 50;
+            isWaitingForLock = true;
+            boolean gotLock = player.requestLockAndWait(row, col, new Point(e.getX() % 50, e.getY() % 50));
+            isWaitingForLock = false;
+            if (!gotLock) {
+                hasLock = false;
+                if (statusLabel != null) {
+                    statusLabel.setText("Lock denied. Try another cell.");
+                }
+                return;
+            }
 
             // Send a message to lock this cell for this player
-            MessageToSend lockMsg = new MessageToSend(currentCellRow, currentCellCol,
-                    new Point(e.getX() % 50, e.getY() % 50),
-                    playerColor, "Lock");
-            player.sendMessage(lockMsg);
+//            MessageToSend lockMsg = new MessageToSend(currentCellRow, currentCellCol,
+//                    new Point(e.getX() % 50, e.getY() % 50),
+//                    playerColor, "Lock");
+//            player.sendMessage(lockMsg);
+            hasLock = true;
+            currentCellRow = row;
+            currentCellCol = col;
+            cell.setBeingClaimed(true);
+            cellBeingDrawnOn = cell;
 
             // Update the status label
             if (statusLabel != null) {
@@ -72,6 +89,8 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     @Override
     public void mouseDragged(MouseEvent e) {
+
+        if (!hasLock || isWaitingForLock) return;
         drawPixel(cellBeingDrawnOn, e.getX(), e.getY(), playerColor);
     }
 
@@ -104,10 +123,11 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
 
     @Override
     public void mouseReleased(MouseEvent e) {
+        if (!hasLock || isWaitingForLock) return;
         if (cellBeingDrawnOn != null) {
             boolean filled = cellBeingDrawnOn.checkIfValidFill(playerColor);
 
-            String messageType = filled ? "Filled" : "Unlock";
+            String messageType = filled ? "Filled" : "NotFilled";
             MessageToSend releaseMsg = new MessageToSend(currentCellRow, currentCellCol,
                     new Point(e.getX() % 50, e.getY() % 50),
                     playerColor, messageType);
@@ -184,5 +204,9 @@ public class GamePanel extends JPanel implements MouseListener, MouseMotionListe
             return "Draw";
         }
         return winner;
+    }
+
+    public Color getColor() {
+        return this.playerColor;
     }
 }

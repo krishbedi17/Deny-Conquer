@@ -10,6 +10,7 @@ public class MessageToSend implements Serializable {
     SerializablePoint pixel; // Changed from Point to SerializablePoint
     Color playerColor;
     String type;
+    String senderID;
 
     public MessageToSend(int row, int col, Point pixel, Color playerColor, String type) {
         this.row = row;
@@ -17,6 +18,15 @@ public class MessageToSend implements Serializable {
         this.pixel = new SerializablePoint(pixel.x, pixel.y); // Convert Point to SerializablePoint
         this.playerColor = playerColor;
         this.type = type;
+        this.senderID = senderID;
+    }
+
+    public void setSenderID(String senderID) {
+        this.senderID = senderID;
+    }
+
+    public String getSenderID() {
+        return senderID;
     }
 
     public String getType() {

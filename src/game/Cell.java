@@ -4,6 +4,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Cell {
     Color colorOfCell = Color.WHITE;
@@ -13,10 +14,20 @@ public class Cell {
     Point locOnCanvas;
     BufferedImage drawing = new BufferedImage(50, 50, BufferedImage.TYPE_INT_ARGB);
 
+    private final ReentrantLock lock = new ReentrantLock();
+
     private final Set<Point> pixelSet = new HashSet<>();
 
     public Cell(int x, int y) {
         locOnCanvas = new Point(x, y);
+    }
+
+    public boolean tryLock() {
+        return lock.tryLock();
+    }
+
+    public void unlock() {
+        lock.unlock();
     }
 
     public void draw(Graphics g, int x, int y) {
