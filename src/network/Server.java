@@ -35,6 +35,51 @@ public class Server {
         }
     }
 
+    public void sendToClient(String clientID, MessageToSend msg) {
+        for (ClientHandler client : clients) {
+            if (client.getClientID().equals(clientID)) {
+                client.send(msg);
+                break;
+            }
+        }
+    }
+
+//    public void serverAction(MessageToSend message) {
+//        String messageType = message.getType();
+//        System.out.println("Message Type: " + messageType);
+//        if (messageType.equals("RequestLock")) {
+//            grantLock(message);
+//        } else if (messageType.equals("ReleaseFilled")) {
+//            // stays locked
+//            broadcast(message);
+//        }  else if (messageType.equals("ReleaseNotFilled")) {
+//            Cell releasedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
+//            if (releasedCell != null) {
+//                releasedCell.unlock();
+//            }
+//            broadcast(message);
+//        } else if (messageType.equals("Scribble")) {
+//            broadcast(message);
+//        }
+//    }
+
+    public void grantLock(MessageToSend message) {
+        Cell requestedCell = board.getCellByRowAndCol(message.getRow(), message.getCol());
+        System.out.println("Lock requested by" + message.getSenderID());
+        if (requestedCell != null && requestedCell.tryLock()) {
+            // Lock acquired — send confirmation only to sender
+            message.setType("LockGranted");
+            sendToClient(message.getSenderID(), message);
+            System.out.println("Lock was granted to: " + message.getSenderID());
+        } else {
+            // Lock not acquired — deny request
+            System.out.println("DENIED: " + message.senderID);
+            message.setType("LockNotGranted");
+            sendToClient(message.getSenderID(), message);
+            System.out.println("Lock not able granted to: " + message.getSenderID());
+        }
+    }
+
     public void remove(ClientHandler client) {
         clients.remove(client);
     }
@@ -46,5 +91,9 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void unlockCell(int row, int col) {
+        board.getCellByRowAndCol(row, col).unlock();
     }
 }

@@ -8,13 +8,16 @@ public class ClientHandler implements Runnable {
     ObjectInputStream in = null;
     ObjectOutputStream out = null;
     private final Server server;
+    private String clientId;
+    private static int count = 0;
+
 
     public ClientHandler(Socket socket, Server server) {
         this.socket = socket;
         this.server = server;
     }
 
-    public void send(Object obj) {
+    public synchronized void send(Object obj) {
         try {
             if (out != null) {
                 out.writeObject(obj);
@@ -28,8 +31,10 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
-            in = new ObjectInputStream(socket.getInputStream());
+           
             out = new ObjectOutputStream(socket.getOutputStream());
+            out.flush(); // Ensure the stream header is sent
+            in = new ObjectInputStream(socket.getInputStream());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -38,10 +43,23 @@ public class ClientHandler implements Runnable {
             Object obj;
             while ((obj = in.readObject()) != null) {
                 if (obj instanceof MessageToSend message) {
-                    System.out.println("Received message: " + message);
+
+                    if (clientId == null) {
+                        clientId = message.getSenderID(); // Set clientId from the first message
+                    }
 //                    System.out.println(message.pixel.x + message.pixel.y);
-                    out.writeObject("Received your message!");
-                    server.broadcast(message);
+//                    out.writeObject("Received your message!");
+                    if (message.getType().equals("RequestLock")) {
+                        System.out.println("Received message: " + message.getType());
+                        server.grantLock(message);
+                    } else if (message.getType().equals("NotFilled")) {
+                        System.out.println("Received message: " + message.getType());
+                        server.unlockCell(message.getRow(), message.getCol());
+                        server.broadcast(message);
+                    }
+                    else {
+                        server.broadcast(message);
+                    }
                 }
             }
         } catch (EOFException e) {
@@ -58,4 +76,8 @@ public class ClientHandler implements Runnable {
             System.out.println("Client disconnected: " + socket.getInetAddress());
         }
     }
+    public String getClientID() {
+        return clientId;
+    }
+
 }
